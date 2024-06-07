@@ -1,0 +1,27 @@
+{
+  "name": "@trace/tree",
+  "version": "0.0.0-development",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build:code": "node esbuild.mjs",
+    "build:types": "tsc --emitDeclarationOnly --declaration --project tsconfig.build.json",
+    "build": "pnpm run build:code",
+    "clean:build": "rimraf ./dist",
+    "dev": "nodemon",
+    "lint": "eslint . --ext .js,.ts",
+    "lint:fix": "pnpm lint --fix",
+    "format": "prettier --check .",
+    "format:fix": "prettier --write .",
+    "test": "jest",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "@trace/artifacts": "workspace:0.0.0-development",
+    "graphology": "^0.25.4",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "graphology-types": "^0.24.7"
+  }
+}

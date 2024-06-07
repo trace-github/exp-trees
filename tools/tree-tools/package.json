@@ -1,0 +1,31 @@
+{
+  "name": "@tools/tree",
+  "version": "0.0.0-development",
+  "main": "dist/main.js",
+  "types": "dist/main.d.ts",
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "clean:build": "rimraf ./dist",
+    "dev": "nodemon",
+    "lint": "eslint . --ext .js,.ts",
+    "lint:fix": "pnpm lint --fix",
+    "format": "prettier --check .",
+    "format:fix": "prettier --write .",
+    "test": "jest",
+    "typecheck": "tsc",
+    "tree-tools": "node ./dist/main.js"
+  },
+  "dependencies": {
+    "@trace/artifacts": "workspace:0.0.0-development",
+    "@trace/tree": "workspace:0.0.0-development",
+    "chalk": "4.1.2",
+    "cli-table3": "^0.6.5",
+    "ora": "5.4.1",
+    "prompts": "^2.4.2",
+    "yargs": "^17.7.2"
+  },
+  "devDependencies": {
+    "@types/prompts": "^2.4.9",
+    "@types/yargs": "^17.0.32"
+  }
+}
