@@ -4,21 +4,23 @@ import {
   MonoTypeOperatorFunction,
   Observable,
   concatMap,
-  firstValueFrom,
   map,
   of,
-  shareReplay,
+  shareReplay
 } from "rxjs";
 import { fetchArrayBuffer, fetchJSON } from "../fetch";
 import { pathJoin } from "../path";
 import {
   GoogleCloudStorageConfig,
   IResourceReader,
-  ResourceURL,
+  ResourceConfig,
+  ResourceURL
 } from "../types";
 import { signer } from "./signing";
 
 export class GoogleCloudResourceReader implements IResourceReader {
+  public readonly config: ResourceConfig;
+
   private readonly signer: (url: ResourceURL) => Promise<string>;
   private readonly bucket: string;
 
@@ -26,6 +28,7 @@ export class GoogleCloudResourceReader implements IResourceReader {
   private readonly cacheJSON: Map<ResourceURL, Observable<any>>;
 
   constructor(config: GoogleCloudStorageConfig) {
+    this.config = config;
     this.signer = signer(config);
     this.bucket = config.root;
 
@@ -33,7 +36,7 @@ export class GoogleCloudResourceReader implements IResourceReader {
     this.cacheJSON = new Map();
   }
 
-  buffer(resource: ResourceURL): Promise<ArrayBufferLike> {
+  buffer(resource: ResourceURL): Observable<ArrayBufferLike> {
     if (!this.cacheBuffer.has(resource)) {
       const obs = of(resource).pipe(
         fix__rxResolveAbsoluteLocation(this.bucket),
@@ -48,13 +51,13 @@ export class GoogleCloudResourceReader implements IResourceReader {
       this.cacheBuffer.set(resource, obs);
     }
 
-    return firstValueFrom(this.cacheBuffer.get(resource)!);
+    return this.cacheBuffer.get(resource)!;
   }
 
   json<T = any>(
     resource: ResourceURL,
     check?: ((d: unknown) => d is T) | undefined
-  ): Promise<T> {
+  ): Observable<T> {
     if (!this.cacheBuffer.has(resource)) {
       const obs = of(resource).pipe(
         fix__rxResolveAbsoluteLocation(this.bucket),
@@ -69,7 +72,7 @@ export class GoogleCloudResourceReader implements IResourceReader {
       this.cacheJSON.set(resource, obs);
     }
 
-    return firstValueFrom(this.cacheJSON.get(resource)!);
+    return this.cacheJSON.get(resource)!;
   }
 }
 

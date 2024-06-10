@@ -1,5 +1,6 @@
-import { CubeTimeGrain, IResourceReader, ResourceURL } from "@trace/artifacts";
+import { CubeTimeGrain, IResourceReader } from "@trace/artifacts";
 import { MultiDirectedGraph } from "graphology";
+import { firstValueFrom } from "rxjs";
 import { TreeConfig } from "../types";
 import {
   ITreeClient,
@@ -8,13 +9,12 @@ import {
   TreeResponse
 } from "../types-resource";
 import { LegacyTreeCatalog } from "./types";
-import { isLegacyTreeCatalog } from "./types.guard";
 
 export class LegacyTreeClient implements ITreeClient {
   private readonly data: LegacyTreeCatalog;
   private readonly reader: IResourceReader;
 
-  private constructor(reader: IResourceReader, data: LegacyTreeCatalog) {
+  constructor(reader: IResourceReader, data: LegacyTreeCatalog) {
     this.reader = reader;
     this.data = data;
   }
@@ -53,17 +53,12 @@ export class LegacyTreeClient implements ITreeClient {
 
     if (!tree) throw "No such tree (timeGrain).";
 
-    const json = await this.reader.json(tree.path);
+    const json = await firstValueFrom(this.reader.json(tree.path));
 
     // TODO (ak): Need to find a way to validate the json.
     let config: TreeConfig = new MultiDirectedGraph();
     config = config.import(json as any);
 
     return { config };
-  }
-
-  public static async from(reader: IResourceReader, target: ResourceURL) {
-    const treesList = await reader.json(target, isLegacyTreeCatalog);
-    return new LegacyTreeClient(reader, treesList);
   }
 }

@@ -1,9 +1,12 @@
 import { CubeTimeGrain } from "@trace/artifacts";
-import { ITreeClient, TreeConfig, TreeListResponse } from "@trace/tree";
+import { ITreeClient, TreeListResponse } from "@trace/tree";
 import prompts from "prompts";
 
-export async function promptTree(client: ITreeClient): Promise<TreeConfig> {
-  const { tree: group }: { tree: TreeListResponse } = await prompts({
+export async function promptTree(client: ITreeClient): Promise<{
+  treeId: string;
+  timeGrain: CubeTimeGrain;
+}> {
+  const { tree }: { tree: TreeListResponse } = await prompts({
     type: "autocomplete",
     name: "tree",
     message: "Pick a tree",
@@ -16,7 +19,7 @@ export async function promptTree(client: ITreeClient): Promise<TreeConfig> {
     type: "autocomplete",
     name: "timeGrain",
     message: "Pick a time grain",
-    choices: group.timeGrain.map((timeGrain) => {
+    choices: tree.timeGrain.map((timeGrain) => {
       return {
         title: timeGrain,
         value: timeGrain
@@ -24,7 +27,8 @@ export async function promptTree(client: ITreeClient): Promise<TreeConfig> {
     })
   });
 
-  const { config } = await client.tree(group.id, timeGrain as CubeTimeGrain);
-
-  return config;
+  return {
+    treeId: tree.id,
+    timeGrain
+  };
 }

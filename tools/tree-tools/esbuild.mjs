@@ -1,4 +1,5 @@
 import { build } from "esbuild";
+import { wasmLoader } from "esbuild-plugin-wasm";
 
 export const buildNode = async ({ ...args }) => {
   await build({
@@ -10,6 +11,7 @@ export const buildNode = async ({ ...args }) => {
     bundle: true,
     logLevel: "error",
     tsconfig: "tsconfig.build.json",
+    plugins: [wasmLoader()],
     ...args
   })
 };

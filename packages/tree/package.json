@@ -19,9 +19,12 @@
   "dependencies": {
     "@trace/artifacts": "workspace:0.0.0-development",
     "graphology": "^0.25.4",
+    "graphology-traversal": "^0.3.1",
     "rxjs": "^7.8.1"
   },
   "devDependencies": {
+    "graphology-dag": "^0.4.1",
+    "graphology-operators": "^1.6.0",
     "graphology-types": "^0.24.7"
   }
 }

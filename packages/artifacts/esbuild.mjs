@@ -9,8 +9,6 @@ export const buildNode = async ({ ...args }) => {
     bundle: true,
     logLevel: "error",
     tsconfig: "tsconfig.build.json",
-    ...args,
-
     plugins: [
       {
         name: 'TypeScriptDeclarationsPlugin',
@@ -20,8 +18,10 @@ export const buildNode = async ({ ...args }) => {
             execSync('tsc -p tsconfig.build.json --emitDeclarationOnly')
           })
         }
-      }
-    ]
+      },
+    ],
+
+    ...args,
   })
 };
 

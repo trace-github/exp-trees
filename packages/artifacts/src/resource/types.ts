@@ -1,35 +1,45 @@
+import { Observable } from "rxjs";
+
 export type ResourceURL = string;
 
 export enum BackendType {
   GCS = "gs",
   HTTP = "http",
   HTTPS = "https",
-  File = "file",
+  File = "file"
 }
 
 export interface IResourceReader {
-  buffer(resource: ResourceURL): Promise<ArrayBufferLike>;
+  readonly config: ResourceConfig;
+
+  buffer(resource: ResourceURL): Observable<ArrayBufferLike>;
   json<T = any>(
     resource: ResourceURL,
     check?: (d: unknown) => d is T
-  ): Promise<T>;
+  ): Observable<T>;
 }
 
-interface ResourceConfig {
-  backend: BackendType.File;
-  root: ResourceURL;
+export interface ResourceConfig {
+  readonly backend: BackendType;
+  readonly root: ResourceURL;
 }
 
-export interface FileBackedConfig extends ResourceConfig {}
-
-export interface GoogleCloudStorageConfig {
-  backend: BackendType.GCS;
-  signatory: ResourceURL;
-  root: ResourceURL;
+export interface FileBackedConfig extends ResourceConfig {
+  readonly backend: BackendType.File;
 }
 
-export interface HTTPConfig extends ResourceConfig {}
-export interface HTTPSConfig extends ResourceConfig {}
+export interface GoogleCloudStorageConfig extends ResourceConfig {
+  readonly backend: BackendType.GCS;
+  readonly signatory: ResourceURL;
+}
+
+export interface HTTPConfig extends ResourceConfig {
+  readonly backend: BackendType.HTTP;
+}
+
+export interface HTTPSConfig extends ResourceConfig {
+  readonly backend: BackendType.HTTPS;
+}
 
 export type BackendConfig =
   | FileBackedConfig
