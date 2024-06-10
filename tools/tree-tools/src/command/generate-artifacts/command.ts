@@ -1,20 +1,11 @@
 import {
   CubeSeries,
   GoogleCloudResourceReader,
-  IResourceReader,
-  ParquetCatalogReader
+  initParquetCatalog
 } from "@trace/artifacts";
-import {
-  LegacyTreeClient,
-  Tree,
-  isLegacyTreeCatalog,
-  resolvingVisitor
-} from "@trace/tree";
-import * as Arrow from "apache-arrow";
+import { Tree, initLegacyTrees, resolvingVisitor } from "@trace/tree";
 import { MultiDirectedGraph } from "graphology";
 import os from "node:os";
-import { readParquet } from "parquet-wasm";
-import { firstValueFrom } from "rxjs";
 import { CommandModule } from "yargs";
 import { dirExists, must, printTable, spinner } from "../../lib";
 import { duckdb } from "../../lib/duckdb/duckdb.node";
@@ -64,8 +55,12 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
     // Initialize core clients.
     const remoteConfig = Trace.remoteConfig(customer);
     const reader = new GoogleCloudResourceReader(remoteConfig);
-    const trees = await spinner("Trees", initTrees(reader, workspace));
-    const catalog = await spinner("Catalog", initCatalog(reader, workspace));
+    const trees = await spinner("Trees", initLegacyTrees(reader, workspace));
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const catalog = await spinner(
+      "Catalog",
+      initParquetCatalog(reader, workspace)
+    );
 
     // Show workspace summary.
     {
@@ -101,31 +96,10 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
 
     try {
       const conn = await db.connect();
-      console.log(await conn.query("select 1"));
+      console.log((await conn.query("select 1")).toString());
       await conn.close();
     } finally {
       await db.terminate();
     }
-
-    catalog;
   }
 };
-
-// NOTE: I tried moving this into the ParquetReader class (static method);
-// however, I was having "build" issues re: parquet-wasm.
-async function initCatalog(reader: IResourceReader, workspace: string) {
-  const buffer = await firstValueFrom(
-    reader.buffer([workspace, "catalog.parquet"].join("/"))
-  );
-  const pq = readParquet(new Uint8Array(buffer));
-  const table = Arrow.tableFromIPC(pq.intoIPCStream());
-
-  return ParquetCatalogReader.withRelativeRoot(table, reader.config.root);
-}
-
-async function initTrees(reader: IResourceReader, workspace: string) {
-  const treesList = await firstValueFrom(
-    reader.json(`${workspace}/trees/trees.json`, isLegacyTreeCatalog)
-  );
-  return new LegacyTreeClient(reader, treesList);
-}

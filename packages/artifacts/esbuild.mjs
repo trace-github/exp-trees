@@ -1,28 +1,28 @@
 import { execSync } from 'child_process';
-import { build } from "esbuild";
+import { wasmLoader } from "esbuild-plugin-wasm";
 
-export const buildNode = async ({ ...args }) => {
-  await build({
-    entryPoints: ["src/index.ts"],
-    format: "cjs",
-    outdir: "./dist",
-    bundle: true,
-    logLevel: "error",
-    tsconfig: "tsconfig.build.json",
-    plugins: [
-      {
-        name: 'TypeScriptDeclarationsPlugin',
-        setup(build) {
-          build.onEnd((result) => {
-            if (result.errors.length > 0) return
-            execSync('tsc -p tsconfig.build.json --emitDeclarationOnly')
-          })
-        }
-      },
-    ],
+import esbuild from 'esbuild';
 
-    ...args,
-  })
-};
+await esbuild.build({
+  entryPoints: ["src/index.ts"],
+  outdir: "./dist",
+  format: "cjs",
+  logLevel: "error",
+  tsconfig: "tsconfig.build.json",
 
-await buildNode({});
+  plugins: [
+    wasmLoader({
+      mode: 'embedded',
+    }),
+    {
+      name: 'TypeScriptDeclarationsPlugin',
+      setup(build) {
+        build.onEnd((result) => {
+          if (result.errors.length > 0) return
+          execSync('tsc -p tsconfig.build.json --emitDeclarationOnly')
+        })
+      }
+    },
+
+  ],
+})

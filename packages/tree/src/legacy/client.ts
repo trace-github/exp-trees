@@ -9,7 +9,17 @@ import {
   TreeResponse
 } from "../types-resource";
 import { LegacyTreeCatalog } from "./types";
+import { isLegacyTreeCatalog } from "./types.guard";
 
+export async function initLegacyTrees(
+  reader: IResourceReader,
+  workspace: string
+) {
+  const treesList = await firstValueFrom(
+    reader.json(`${workspace}/trees/trees.json`, isLegacyTreeCatalog)
+  );
+  return new LegacyTreeClient(reader, treesList);
+}
 export class LegacyTreeClient implements ITreeClient {
   private readonly data: LegacyTreeCatalog;
   private readonly reader: IResourceReader;

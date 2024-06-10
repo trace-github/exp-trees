@@ -90,6 +90,9 @@ importers:
       '@types/object-hash':
         specifier: ^3.0.6
         version: 3.0.6
+      esbuild-plugin-wasm:
+        specifier: ^1.1.0
+        version: 1.1.0
 
   packages/tree:
     dependencies:
@@ -145,6 +148,9 @@ importers:
       ora:
         specifier: 5.4.1
         version: 5.4.1
+      parquet-wasm:
+        specifier: 0.6.0
+        version: 0.6.0
       prompts:
         specifier: ^2.4.2
         version: 2.4.2
@@ -167,9 +173,6 @@ importers:
       graphology-types:
         specifier: ^0.24.7
         version: 0.24.7
-      parquet-wasm:
-        specifier: 0.6.0
-        version: 0.6.0
 
 packages:
 
@@ -2065,7 +2068,6 @@ packages:
   /esbuild-plugin-wasm@1.1.0:
     resolution: {integrity: sha512-0bQ6+1tUbySSnxzn5jnXHMDvYnT0cN/Wd4Syk8g/sqAIJUg7buTIi22svS3Qz6ssx895NT+TgLPb33xi1OkZig==}
     engines: {node: '>=0.10.0'}
-    dev: false
 
   /esbuild@0.21.4:
     resolution: {integrity: sha512-sFMcNNrj+Q0ZDolrp5pDhH0nRPN9hLIM3fRPwgbLYJeSHHgnXSnbV3xYgSVuOeLWH9c73VwmEverVzupIv5xuA==}
@@ -3592,6 +3594,7 @@ packages:
 
   /parquet-wasm@0.6.0:
     resolution: {integrity: sha512-2qIG14DOOGdvsdmZ8WNgBc8pAhSM2Cv/ArxkmLLt1G3Z9+EAw27+SSRAUz/bET+6gD6mm7CM4kN1eKEAnTCwCA==}
+    dev: false
 
   /parse-json@5.2.0:
     resolution: {integrity: sha512-ayCKvm/phCGxOkYRSCM82iDwct8/EonSEgCSxWxD7ve6jHggsFl4fZVQBPRNgQoKiuV/odhFrGzQXZwbifC8Rg==}

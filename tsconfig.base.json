@@ -4,7 +4,7 @@
     /* Basic Options */
     "incremental": true,
     "declaration": true,
-    "allowJs": false,
+    "allowJs": true,
     "noEmit": true,
     /* Strict Type-Checking Options */
     "noImplicitAny": true,

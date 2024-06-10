@@ -1,11 +1,25 @@
+import * as Arrow from "apache-arrow";
 import deepEqual from "fast-deep-equal";
 import hash from "object-hash";
-import { Observable, of } from "rxjs";
-import { ResourceURL } from "../resource";
+import { readParquet } from "parquet-wasm";
+import { Observable, firstValueFrom, of } from "rxjs";
+import { IResourceReader, ResourceURL } from "../resource";
 import { Attribute, CubeRequest, CubeTimeGrain } from "../types";
 import { Catalog } from "../types-schema";
 import { ICatalogReader, PathModifer } from "./types";
 
+export async function initParquetCatalog(
+  reader: IResourceReader,
+  workspace: string
+) {
+  const buffer = await firstValueFrom(
+    reader.buffer([workspace, "catalog.parquet"].join("/"))
+  );
+  const pq = readParquet(new Uint8Array(buffer));
+  const table = Arrow.tableFromIPC(pq.intoIPCStream());
+
+  return ParquetCatalogReader.withRelativeRoot(table, reader.config.root);
+}
 export class ParquetCatalogReader implements ICatalogReader {
   private readonly catalog: Catalog;
   private readonly pathModifier: PathModifer;
