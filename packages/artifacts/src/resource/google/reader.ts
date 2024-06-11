@@ -1,5 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
+import { measure } from "@trace/common";
 import {
   MonoTypeOperatorFunction,
   Observable,
@@ -40,6 +39,7 @@ export class GoogleCloudResourceReader implements IResourceReader {
     return resource;
   }
 
+  @measure("GoogleCloudResourceReader.buffer")
   buffer(resource: ResourceURL): Observable<ArrayBufferLike> {
     if (!this.cacheBuffer.has(resource)) {
       const obs = of(resource).pipe(
@@ -58,6 +58,7 @@ export class GoogleCloudResourceReader implements IResourceReader {
     return this.cacheBuffer.get(resource)!;
   }
 
+  @measure("GoogleCloudResourceReader.json")
   json<T = any>(
     resource: ResourceURL,
     check?: ((d: unknown) => d is T) | undefined

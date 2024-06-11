@@ -133,5 +133,7 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
     }
 
     await db.terminate();
+
+    console.log(performance.getEntriesByType("measure"));
   }
 };
