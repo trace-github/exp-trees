@@ -1,4 +1,6 @@
-import { access, constants, writeFile } from "fs/promises";
+import { measure } from "@trace/common";
+import { accessSync } from "fs";
+import { constants, writeFile } from "fs/promises";
 import { mkdirp } from "mkdirp";
 import path from "path";
 import { FileBackedConfig, IResourceWriter, ResourceURL } from "../types";
@@ -10,16 +12,14 @@ export class FileBackedWriter implements IResourceWriter {
     this.config = config;
   }
 
-  protected resolve(resource: ResourceURL): ResourceURL {
-    return [this.config.root, resource].join("/");
-  }
-
-  async exists(resource: ResourceURL): Promise<boolean> {
+  @measure("FileBackedWriter.exists")
+  exists(resource: ResourceURL): boolean {
     const filePath = this.resolve(resource);
-    const exists = await FileBackedWriter.fileExists(filePath);
+    const exists = FileBackedWriter.fileExists(filePath);
     return exists;
   }
 
+  @measure("FileBackedWriter.writeBuffer")
   async writeBuffer(
     resource: ResourceURL,
     buffer: ArrayBufferLike
@@ -34,6 +34,7 @@ export class FileBackedWriter implements IResourceWriter {
     return;
   }
 
+  @measure("FileBackedWriter.writeJSON")
   async writeJSON(resource: ResourceURL, json: unknown): Promise<void> {
     const filePath = this.resolve(resource);
 
@@ -42,9 +43,16 @@ export class FileBackedWriter implements IResourceWriter {
     return writeFile(filePath, JSON.stringify(json), { flag: "w+" });
   }
 
-  private static fileExists(resource: ResourceURL): Promise<boolean> {
-    return access(resource, constants.F_OK)
-      .then(() => true)
-      .catch(() => false);
+  protected resolve(resource: ResourceURL): ResourceURL {
+    return [this.config.root, resource].join("/");
+  }
+
+  private static fileExists(resource: ResourceURL): boolean {
+    try {
+      accessSync(resource, constants.F_OK);
+      return true;
+    } catch {
+      return false;
+    }
   }
 }

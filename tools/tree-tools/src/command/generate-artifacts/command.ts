@@ -1,16 +1,16 @@
 import {
   BackendType,
   CubeSeries,
-  CubeSlice,
   DuckDBBackedArtifactsReader,
   FileBackedConfig,
   GoogleCloudResourceReader,
   initParquetCatalog
 } from "@trace/artifacts";
 import { Tree, initLegacyTrees, resolvingVisitor } from "@trace/tree";
+import cliProgress from "cli-progress";
 import { MultiDirectedGraph } from "graphology";
 import os from "node:os";
-import { Observable, firstValueFrom, zip } from "rxjs";
+import { Observable, firstValueFrom, from, mergeMap, tap, toArray } from "rxjs";
 import { CommandModule } from "yargs";
 import { dirExists, must, printTable, spinner } from "../../lib";
 import { duckdb } from "../../lib/duckdb/duckdb.node";
@@ -45,14 +45,17 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
   },
 
   async handler({ customer, workspace = "main", workdir }) {
-    workdir = "/Users/andy/Documents/Code/trace/data";
+    workdir = "/Users/andy/Desktop/TEST";
 
     // Ensure cli variables are valid.
     must(dirExists(workdir), "Scratch directory does not exist");
 
     // Show cli variables.
     {
-      printTable(["Customer", "Workspace"], [customer, workspace]);
+      printTable(
+        ["Customer", "Workspace", "Work Dir"],
+        [customer, workspace, workdir]
+      );
       console.log("\n");
     }
 
@@ -79,12 +82,6 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
       fileCacheConfig
     );
 
-    // Show workspace summary.
-    {
-      printTable(["Customer", "Workspace"], [customer, workspace]);
-      console.log("\n");
-    }
-
     // Core variables.
     const tree: Tree<CubeSeries> = new MultiDirectedGraph();
 
@@ -104,23 +101,49 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
 
     // Resolve tree.
     {
-      const slices: Observable<CubeSlice>[] = [];
+      const series: Observable<CubeSeries>[] = [];
 
       resolvingVisitor(tree, {
-        onMetricNode(_tree, node, attributes) {
-          slices.push(
-            artifacts.cubeSlice({
+        onMetricNode(_tree, _node, attributes) {
+          series.push(
+            artifacts.cubeSeries({
               metricName: attributes.metricName,
               timeGrain: attributes.timeGrain,
-              segment: attributes.series.map(({ name }) => name)
+              series: attributes.series
             })
           );
         }
       });
 
+      // 6-7s
+      // const result = await firstValueFrom(zip(series));
+
+      // c = 1; 11s
+      // c = 4; 6s
+      // c = 8; 6s
+      // c = 16; 7s
+
+      const bar = new cliProgress.SingleBar(
+        {},
+        cliProgress.Presets.shades_classic
+      );
+
+      bar.start(series.length, 0);
+
       performance.mark("resolve-all-start");
-      const result = await firstValueFrom(zip(slices));
+      const result = await firstValueFrom(
+        from(series).pipe(
+          mergeMap((d) => d, 16),
+          tap(() => {
+            bar.increment(1);
+          }),
+          toArray()
+        )
+      );
+      bar.stop();
       performance.mark("resolve-all-end");
+
+      // console.log(performance.getEntriesByType("measure"));
 
       console.log(
         performance.measure(
@@ -133,7 +156,5 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
     }
 
     await db.terminate();
-
-    console.log(performance.getEntriesByType("measure"));
   }
 };

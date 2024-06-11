@@ -1,3 +1,4 @@
+import { measure } from "@trace/common";
 import { readFile } from "fs/promises";
 import { Observable, from, map, shareReplay } from "rxjs";
 import { ResourceError } from "../error";
@@ -17,6 +18,7 @@ export class FileBackedReader implements IResourceReader {
     return [this.config.root, resource].join("/");
   }
 
+  @measure("FileBackedReader.buffer")
   buffer(resource: ResourceURL): Observable<ArrayBufferLike> {
     if (!this.cacheBuffer.has(resource)) {
       const path = this.resolve(resource);
@@ -27,6 +29,7 @@ export class FileBackedReader implements IResourceReader {
     return this.cacheBuffer.get(resource)!;
   }
 
+  @measure("FileBackedReader.json")
   json<T>(
     resource: ResourceURL,
     check?: (d: unknown) => d is T

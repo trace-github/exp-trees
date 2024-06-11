@@ -21,7 +21,7 @@ export interface IResourceReader {
 }
 
 export interface IResourceWriter {
-  exists(location: ResourceURL): Promise<boolean>;
+  exists(location: ResourceURL): boolean;
   writeBuffer(location: ResourceURL, data: ArrayBufferLike): Promise<void>;
   writeJSON(location: ResourceURL, data: unknown): Promise<void>;
 }

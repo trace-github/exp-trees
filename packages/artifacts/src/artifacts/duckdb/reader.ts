@@ -1,14 +1,17 @@
 import { AsyncDuckDB, AsyncDuckDBConnection } from "@duckdb/duckdb-wasm";
+import { measure } from "@trace/common";
 import * as Arrow from "apache-arrow";
 import hash from "object-hash";
-import { readParquet } from "parquet-wasm";
+import { Table, readParquet, writeParquet } from "parquet-wasm";
 import {
+  MonoTypeOperatorFunction,
   Observable,
   OperatorFunction,
   concatMap,
   firstValueFrom,
   from,
   map,
+  mergeMap,
   of,
   shareReplay,
   zip
@@ -27,6 +30,7 @@ import {
   Cube,
   CubeSchema,
   CubeSeries,
+  CubeSeriesSchema,
   CubeSlice,
   CubeSliceSchema
 } from "../../types-schema";
@@ -63,9 +67,10 @@ export class DuckDBBackedArtifactsReader implements IArtifactReader {
     this.cacheWriter = new FileBackedWriter(fileCacheConfig);
   }
 
+  @measure("DuckDBBackedArtifactsReader.cubeShard")
   cubeShard(request: CubeRequest): Observable<Cube> {
     return of(request).pipe(
-      concatMap(this.catalog.cube),
+      concatMap((request) => this.catalog.cube(request)),
       concatMap((resource) => {
         if (!this.cacheCube.has(resource)) {
           const obs = of(resource).pipe(
@@ -88,56 +93,35 @@ export class DuckDBBackedArtifactsReader implements IArtifactReader {
     );
   }
 
+  @measure("DuckDBBackedArtifactsReader.cubeSlice")
   cubeSlice(request: CubeSliceRequest): Observable<CubeSlice> {
     const resource = cubeSliceRequestToResource(request, "parquet");
 
     if (!this.cacheCubeSlice.has(resource)) {
-      const obs = this.cubeShard(request).pipe(
-        // Using Duckdb, slice the shard.
-        concatMap(async () => {
-          const cubeResource = await this.catalog.cube(request);
-          const cubeFile = this.cacheReader.resolve(cubeResource);
-          const cubeBuffer = await firstValueFrom(
-            this.cacheReader.buffer(cubeResource)
-          );
-          const cubeSchema = await readSchemaFromBuffer(cubeBuffer);
-          const cubeMask = mask(
-            readCubeAttributeNames(cubeSchema),
-            request.segment
-          );
-          const cubeSliceAttributeSQL = `struct_pack(${request.segment
-            .map((curr) => `${curr} := a.${curr}`)
-            .join(",")})`;
-          const cubeSliceSQL = `
-            select
-              ${cubeSliceAttributeSQL} as a,
-              cnt,
-              name,
-              value
-            from read_parquet('${cubeFile}')
-            where a_mask = ${cubeMask}
-            order by a.start asc`;
+      const cacheFileExists = this.cacheWriter.exists(resource);
 
-          let conn: AsyncDuckDBConnection | undefined;
-          try {
-            conn = await this.db.connect();
-            const cubeSlice = await conn.query<CubeSliceSchema>(cubeSliceSQL);
+      let obs: Observable<CubeSlice>;
+      if (!cacheFileExists) {
+        obs = of(request).pipe(
+          // Ensure that the cube shard is downloaded
+          rxEnsureAction((request) => this.cubeShard(request)),
+
+          // Compute the slice
+          rxGenerateCubeSlice(this.db, this.catalog, this.cacheReader),
+
+          // Write the result to file.
+          concatMap(async (cubeSlice) => {
+            const cubeSliceBuffer = writeParquet(
+              Table.fromIPCStream(Arrow.tableToIPC(cubeSlice))
+            );
+            await this.cacheWriter.writeBuffer(resource, cubeSliceBuffer);
             return cubeSlice;
-          } finally {
-            conn?.close();
-          }
-        }),
-
-        // write to FS
-        // concatMap(async (cubeSlice) => {
-        //   await this.cacheWriter.writeBuffer(
-        //     resource,
-        //     writeParquet(Table.fromIPCStream(Arrow.tableToIPC(cubeSlice)))
-        //   );
-        //   return cubeSlice;
-        // }),
-        shareReplay(1)
-      );
+          }),
+          shareReplay(1)
+        );
+      } else {
+        obs = readArrowFile<CubeSliceSchema>(this.cacheReader, resource);
+      }
 
       this.cacheCubeSlice.set(resource, obs);
     }
@@ -145,9 +129,49 @@ export class DuckDBBackedArtifactsReader implements IArtifactReader {
     return this.cacheCubeSlice.get(resource)!;
   }
 
-  cubeSeries(request: CubeSeriesRequest): Promise<CubeSeries> {
-    throw new Error("Method not implemented.");
+  @measure("DuckDBBackedArtifactsReader.cubeSeries")
+  cubeSeries(request: CubeSeriesRequest): Observable<CubeSeries> {
+    const resource = cubeSeriesRequestToResource(request, "parquet");
+    if (!this.cacheCubeSeries.has(resource)) {
+      const obs = of(request).pipe(
+        // Ensure that the cube shard is downloaded
+        mergeMap((request) =>
+          this.cubeSlice({
+            metricName: request.metricName,
+            timeGrain: request.timeGrain,
+            segment: request.series.map(({ name }) => name)
+          }).pipe(map(() => request))
+        ),
+        rxGenerateCubeSeries(this.db, this.cacheReader)
+      );
+
+      this.cacheCubeSeries.set(resource, obs);
+    }
+
+    return this.cacheCubeSeries.get(resource)!;
   }
+}
+
+function rxEnsureAction<T>(
+  action: (args: T) => unknown | Promise<unknown> | Observable<unknown>
+): MonoTypeOperatorFunction<T> {
+  return (source: Observable<T>) =>
+    source.pipe(
+      mergeMap((value) => {
+        const result = action(value);
+
+        let obs: Observable<void>;
+        if (result instanceof Promise) {
+          obs = from(result);
+        } else if (result instanceof Observable) {
+          obs = result;
+        } else {
+          obs = of(undefined);
+        }
+
+        return obs.pipe(map(() => value));
+      })
+    );
 }
 
 function rxBufferFromCache(
@@ -158,9 +182,8 @@ function rxBufferFromCache(
   return (obs) =>
     obs.pipe(
       concatMap((resource) => {
-        return zip([of(resource), from(cacheWriter.exists(resource))]);
-      }),
-      concatMap(([resource, exists]) => {
+        const exists = cacheWriter.exists(resource);
+
         if (exists) {
           return cacheReader.buffer(resource);
         } else {
@@ -175,6 +198,34 @@ function rxBufferFromCache(
     );
 }
 
+function readArrowFile<T extends Arrow.TypeMap = any>(
+  reader: FileBackedReader,
+  resource: ResourceURL
+): Observable<Arrow.Table<T>> {
+  return of(resource).pipe(
+    concatMap((resource) => reader.buffer(resource)),
+    concatMap(async (cubeSliceBuffer) => {
+      const pq = readParquet(new Uint8Array(cubeSliceBuffer));
+      const table = Arrow.tableFromIPC<T>(pq.intoIPCStream());
+      return table;
+    })
+  );
+}
+
+function cubeSeriesRequestToResource(
+  request: CubeSeriesRequest,
+  ext: string = "parquet"
+): ResourceURL {
+  const url = [
+    "cubeSeries$",
+    request.metricName,
+    request.timeGrain,
+    `${hash(request)}.${ext}`
+  ].join("/");
+
+  return url;
+}
+
 function cubeSliceRequestToResource(
   request: CubeSliceRequest,
   ext: string = "parquet"
@@ -187,4 +238,113 @@ function cubeSliceRequestToResource(
   ].join("/");
 
   return url;
+}
+
+function rxGenerateCubeSeries(
+  db: AsyncDuckDB,
+  fsReader: FileBackedReader
+): OperatorFunction<CubeSeriesRequest, CubeSeries> {
+  return (obs) =>
+    obs.pipe(
+      concatMap(async (request) => {
+        const cubeSliceResource = cubeSliceRequestToResource({
+          metricName: request.metricName,
+          segment: request.series.map(({ name }) => name),
+          timeGrain: request.timeGrain
+        });
+        const cubeSliceFile = fsReader.resolve(cubeSliceResource);
+
+        const cubeSeriesCondition = request.series
+          .reduce(
+            (acc, { name, value }) => {
+              if (value == undefined) return acc;
+
+              switch (typeof value) {
+                case "boolean":
+                case "number":
+                case "bigint":
+                  acc.push(`a.${name} = ${value}`);
+                  break;
+
+                case "object":
+                  if (value == null) {
+                    acc.push(`a.${name} is NULL`);
+                    break;
+                  }
+                  throw "Unexpected value type";
+
+                case "string":
+                case "symbol":
+                  acc.push(`a.${name} = '${value.toString()}'`);
+                  break;
+
+                default:
+                  throw "Unexpected value type";
+              }
+
+              return acc;
+            },
+            ["1 = 1"] as string[]
+          )
+          .join(" AND ");
+        const cubeSeriesSQL = `
+          select 
+            * 
+          from read_parquet('${cubeSliceFile}') 
+          where ${cubeSeriesCondition}
+        `;
+
+        let conn: AsyncDuckDBConnection | undefined;
+        try {
+          conn = await db.connect();
+          const table = await conn.query<CubeSeriesSchema>(cubeSeriesSQL);
+          return table;
+        } finally {
+          await conn?.close();
+        }
+      })
+    );
+}
+
+function rxGenerateCubeSlice(
+  db: AsyncDuckDB,
+  catalog: ICatalogReader,
+  fsReader: FileBackedReader
+): OperatorFunction<CubeSliceRequest, CubeSlice> {
+  return (obs) =>
+    obs.pipe(
+      concatMap(async (request) => {
+        const cubeResource = await catalog.cube(request);
+        const cubeFile = fsReader.resolve(cubeResource);
+        const cubeBuffer = await firstValueFrom(fsReader.buffer(cubeResource));
+
+        const cubeSchema = await readSchemaFromBuffer(cubeBuffer);
+        const cubeMask = mask(
+          readCubeAttributeNames(cubeSchema),
+          request.segment
+        );
+
+        const cubeSliceAttributeSQL = `struct_pack(${request.segment
+          .map((curr) => `${curr} := a.${curr}`)
+          .join(",")})`;
+        const cubeSliceSQL = `
+            select
+              ${cubeSliceAttributeSQL} as a,
+              cnt,
+              name,
+              value
+            from read_parquet('${cubeFile}')
+            where a_mask = ${cubeMask}
+            order by a.start asc`;
+
+        let conn: AsyncDuckDBConnection | undefined;
+        try {
+          conn = await db.connect();
+          const cubeSlice = await conn.query<CubeSliceSchema>(cubeSliceSQL);
+          return cubeSlice;
+        } finally {
+          await conn?.close();
+        }
+      })
+    );
 }
