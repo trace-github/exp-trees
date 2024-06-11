@@ -36,6 +36,10 @@ export class GoogleCloudResourceReader implements IResourceReader {
     this.cacheJSON = new Map();
   }
 
+  resolve(resource: ResourceURL): ResourceURL {
+    return resource;
+  }
+
   buffer(resource: ResourceURL): Observable<ArrayBufferLike> {
     if (!this.cacheBuffer.has(resource)) {
       const obs = of(resource).pipe(

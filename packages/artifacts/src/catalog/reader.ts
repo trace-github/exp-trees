@@ -2,57 +2,52 @@ import * as Arrow from "apache-arrow";
 import deepEqual from "fast-deep-equal";
 import hash from "object-hash";
 import { readParquet } from "parquet-wasm";
-import { Observable, firstValueFrom, of } from "rxjs";
+import { firstValueFrom } from "rxjs";
 import { IResourceReader, ResourceURL } from "../resource";
 import { Attribute, CubeRequest, CubeTimeGrain } from "../types";
 import { Catalog } from "../types-schema";
 import { ICatalogReader, PathModifer } from "./types";
 
-export async function initParquetCatalog(
+export const initParquetCatalog = async (
   reader: IResourceReader,
   workspace: string
-) {
+) => {
   const buffer = await firstValueFrom(
     reader.buffer([workspace, "catalog.parquet"].join("/"))
   );
   const pq = readParquet(new Uint8Array(buffer));
   const table = Arrow.tableFromIPC(pq.intoIPCStream());
 
-  return ParquetCatalogReader.withRelativeRoot(table, reader.config.root);
-}
+  return new ParquetCatalogReader(
+    table,
+    relativePathModifier(reader.config.root)
+  );
+};
 export class ParquetCatalogReader implements ICatalogReader {
   private readonly catalog: Catalog;
   private readonly pathModifier: PathModifer;
-  private readonly cacheCube: Map<string, Observable<ResourceURL>>;
+  private readonly cacheCube: Map<string, Promise<ResourceURL>>;
 
-  private constructor(catalog: Catalog, pathModifier: PathModifer) {
+  constructor(catalog: Catalog, pathModifier: PathModifer) {
     this.catalog = catalog;
     this.pathModifier = pathModifier;
+    this.cacheCube = new Map();
   }
 
-  cube(request: CubeRequest): Observable<ResourceURL> {
+  // NOTE: Wat. re: undefined `this` when not using arrow function.
+  cube = (request: CubeRequest): Promise<ResourceURL> => {
     const requestKey = hash(request);
+
     if (!this.cacheCube.has(requestKey)) {
       const url = findCubeResource(this.catalog, request);
-
       if (url == null) throw "Cube not found.";
-
       const modifiedURL = this.pathModifier(url);
-
-      this.cacheCube.set(requestKey, of(modifiedURL));
+      this.cacheCube.set(requestKey, Promise.resolve(modifiedURL));
     }
 
     return this.cacheCube.get(requestKey)!;
-  }
-
-  public static async withRelativeRoot(
-    catalog: Catalog,
-    root: string
-  ): Promise<ParquetCatalogReader> {
-    return new ParquetCatalogReader(catalog, relativePathModifier(root));
-  }
+  };
 }
-
 function findCubeResource(
   catalog: Catalog,
   query: {

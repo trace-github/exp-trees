@@ -12,11 +12,18 @@ export enum BackendType {
 export interface IResourceReader {
   readonly config: ResourceConfig;
 
+  resolve(location: ResourceURL): ResourceURL;
   buffer(resource: ResourceURL): Observable<ArrayBufferLike>;
   json<T = any>(
     resource: ResourceURL,
     check?: (d: unknown) => d is T
   ): Observable<T>;
+}
+
+export interface IResourceWriter {
+  exists(location: ResourceURL): Promise<boolean>;
+  writeBuffer(location: ResourceURL, data: ArrayBufferLike): Promise<void>;
+  writeJSON(location: ResourceURL, data: unknown): Promise<void>;
 }
 
 export interface ResourceConfig {
