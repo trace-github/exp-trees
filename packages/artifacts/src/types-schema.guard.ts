@@ -5,6 +5,7 @@ import {
   CubeSchema,
   CubeSeries,
   CubeSlice,
+  CubeSliceSchema
 } from "./types-schema";
 
 const CUBE_SCHEMA: Arrow.Schema<CubeSchema> = new Arrow.Schema([
@@ -15,7 +16,7 @@ const CUBE_SCHEMA: Arrow.Schema<CubeSchema> = new Arrow.Schema([
 
   // NOTE: since we don't know the struct's inner type apriori, we
   // can not use a straight Arrow schema comparison.
-  new Arrow.Field("a", new Arrow.Struct([]), true),
+  new Arrow.Field("a", new Arrow.Struct([]), true)
 ]);
 
 /**
@@ -41,11 +42,11 @@ export function isCube(table: Arrow.Table): table is Cube {
   return attributeFieldOk;
 }
 
-const CUBESLICE_SCHEMA: Arrow.Schema<CubeSchema> = new Arrow.Schema([
-  new Arrow.Field("cnt", new Arrow.Int(true, 64), false),
+const CUBESLICE_SCHEMA: Arrow.Schema<CubeSliceSchema> = new Arrow.Schema([
+  new Arrow.Field("cnt", new Arrow.Int(true, 64), true),
   new Arrow.Field("name", new Arrow.Utf8(), false),
-  new Arrow.Field("value", new Arrow.Float(Arrow.Precision.DOUBLE), false),
-  new Arrow.Field("a", new Arrow.Struct([]), false),
+  new Arrow.Field("value", new Arrow.Float(Arrow.Precision.DOUBLE), true),
+  new Arrow.Field("a", new Arrow.Struct([]), false)
 ]);
 
 export function isCubeSlice(table: Arrow.Table): table is CubeSlice {
@@ -77,6 +78,8 @@ export function isCubeSlice(table: Arrow.Table): table is CubeSlice {
   return schemaLengthOk;
 }
 
+export const EmptyCubeSeries = new Arrow.Table(CUBESLICE_SCHEMA);
+
 export function isCubeSeries(table: Arrow.Table): table is CubeSeries {
   const sliceOk = isCubeSlice(table);
 
@@ -104,7 +107,7 @@ const CATALOG_SCHEMA: Arrow.Schema<CatalogSchema> = new Arrow.Schema([
     ),
     false
   ),
-  new Arrow.Field("path", new Arrow.Utf8(), false),
+  new Arrow.Field("path", new Arrow.Utf8(), false)
 ]);
 
 export function isCatalog(
@@ -115,7 +118,7 @@ export function isCatalog(
     "artifact_type",
     "time_grain",
     "segments",
-    "path",
+    "path"
   ];
 
   const expected = CATALOG_SCHEMA.select(VALIDATE_FIELDS);

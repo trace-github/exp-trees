@@ -1,5 +1,15 @@
 import { CubeTimeGrain } from "@trace/artifacts";
-import { ITreeClient, TreeListResponse } from "@trace/tree";
+import {
+  ITreeClient,
+  NodeId,
+  Subtree,
+  Tree,
+  TreeListResponse,
+  TreeNodeType,
+  arithmeticTree,
+  rootNode
+} from "@trace/tree";
+import { bfsFromNode } from "graphology-traversal";
 import prompts from "prompts";
 
 export async function promptTree(client: ITreeClient): Promise<{
@@ -31,4 +41,40 @@ export async function promptTree(client: ITreeClient): Promise<{
     treeId: tree.id,
     timeGrain
   };
+}
+
+export function promptNode<T>(
+  tree: Tree<T>,
+  options: { arithmeticOnly?: boolean } = {}
+) {
+  const { arithmeticOnly = true } = options;
+
+  let target: Subtree<T>;
+  if (arithmeticOnly) {
+    target = arithmeticTree(tree);
+  } else {
+    target = tree;
+  }
+
+  const ordered: {
+    node: NodeId;
+    attributes: TreeNodeType<T>;
+    depth: number;
+  }[] = [];
+  bfsFromNode(target, rootNode(target), (node, attributes, depth) => {
+    ordered.push({ node, attributes, depth });
+  });
+
+  return prompts({
+    type: "autocomplete",
+    name: "node",
+    message: "Pick a tree node",
+    initial: rootNode(target),
+    choices: ordered.map(({ node, attributes, depth }) => {
+      return {
+        title: `${attributes.label} [${depth}]`,
+        value: node
+      };
+    })
+  });
 }

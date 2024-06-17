@@ -11,8 +11,8 @@ export type CubeSchema = {
   name: Arrow.Utf8;
   a: Arrow.Struct<AttributeStruct>;
   a_mask: Arrow.Int;
-  cnt: Arrow.Int;
-  value: Arrow.Float;
+  cnt: Arrow.Int | Arrow.Null;
+  value: Arrow.Float | Arrow.Null;
 };
 
 export type Cube = Arrow.Table<CubeSchema>;

@@ -16,6 +16,7 @@ import {
   shareReplay,
   zip
 } from "rxjs";
+import { mask, readAttributeNames } from "../../attributes";
 import { ICatalogReader } from "../../catalog";
 import {
   FileBackedConfig,
@@ -24,7 +25,6 @@ import {
   IResourceReader,
   ResourceURL
 } from "../../resource";
-import { mask, readCubeAttributeNames } from "../../resource/attributes";
 import { CubeRequest, CubeSeriesRequest, CubeSliceRequest } from "../../types";
 import {
   Cube,
@@ -319,10 +319,7 @@ function rxGenerateCubeSlice(
         const cubeBuffer = await firstValueFrom(fsReader.buffer(cubeResource));
 
         const cubeSchema = await readSchemaFromBuffer(cubeBuffer);
-        const cubeMask = mask(
-          readCubeAttributeNames(cubeSchema),
-          request.segment
-        );
+        const cubeMask = mask(readAttributeNames(cubeSchema), request.segment);
 
         const cubeSliceAttributeSQL = `struct_pack(${request.segment
           .map((curr) => `${curr} := a.${curr}`)

@@ -2,19 +2,54 @@ import {
   BackendType,
   CubeSeries,
   DuckDBBackedArtifactsReader,
+  EmptyCubeSeries,
   FileBackedConfig,
   GoogleCloudResourceReader,
-  initParquetCatalog
+  IArtifactReader,
+  cubeSeriesTable,
+  ensureDates,
+  initParquetCatalog,
+  operatorSeries,
+  readAttributeStartDates,
+  replaceNullValue
 } from "@trace/artifacts";
-import { Tree, initLegacyTrees, resolvingVisitor } from "@trace/tree";
+import {
+  EdgeId,
+  EdgeType,
+  NodeId,
+  NodeType,
+  SeriesModifier,
+  Subtree,
+  Tree,
+  TreeEdge,
+  TreeNode,
+  initLegacyTrees,
+  resolvingVisitor,
+  rowScope
+} from "@trace/tree";
 import cliProgress from "cli-progress";
+import { compareAsc, isEqual } from "date-fns";
 import { MultiDirectedGraph } from "graphology";
+import * as MathJS from "mathjs";
 import os from "node:os";
-import { Observable, firstValueFrom, from, mergeMap, tap, toArray } from "rxjs";
+import {
+  MonoTypeOperatorFunction,
+  Observable,
+  OperatorFunction,
+  combineLatest,
+  concatMap,
+  firstValueFrom,
+  forkJoin,
+  from,
+  map,
+  of,
+  tap,
+  toArray
+} from "rxjs";
 import { CommandModule } from "yargs";
 import { dirExists, must, printTable, spinner } from "../../lib";
 import { duckdb } from "../../lib/duckdb/duckdb.node";
-import { promptTree } from "../prompts";
+import { promptNode, promptTree } from "../prompts";
 import { Trace } from "../trace";
 import { GenerateArtifactsArguments } from "./types";
 
@@ -92,69 +127,333 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       tree.import(treeConfig.toJSON() as any);
 
+      const nodesWithTransforms: NodeId[] = [];
+      [...tree.nodeEntries()].forEach(({ node, attributes }) => {
+        if (attributes.transform && attributes.transform.length > 0) {
+          nodesWithTransforms.push(node);
+        }
+      });
+
       printTable(
-        ["label", "Time Grain", "# Nodes"],
-        [tree.getAttribute("label"), tree.getAttribute("timegrain"), tree.order]
+        ["label", "Time Grain", "# Nodes", "# Nodes w/ Transform"],
+        [
+          tree.getAttribute("label"),
+          tree.getAttribute("timegrain"),
+          tree.order,
+          nodesWithTransforms.length
+        ]
       );
       console.log("\n");
     }
 
-    // Resolve tree.
-    {
-      const series: Observable<CubeSeries>[] = [];
+    const bar = new cliProgress.SingleBar({});
 
+    {
+      let at = 0;
       resolvingVisitor(tree, {
-        onMetricNode(_tree, _node, attributes) {
-          series.push(
-            artifacts.cubeSeries({
-              metricName: attributes.metricName,
-              timeGrain: attributes.timeGrain,
-              series: attributes.series
-            })
+        onMetricNode(tree, node) {
+          const obs = rxMetric(artifacts, tree, node).pipe(
+            tap(() => bar.update(at++, { name: node }))
           );
+          tree.setNodeAttribute(node, "data", obs);
+        },
+        onOperatorNode(tree, node) {
+          const obs = rxOperator(artifacts, tree, node).pipe(
+            tap(() => bar.update(at++, { name: node }))
+          );
+          tree.setNodeAttribute(node, "data", obs);
         }
       });
 
-      // 6-7s
-      // const result = await firstValueFrom(zip(series));
+      {
+        const { node } = await promptNode(tree);
 
-      // c = 1; 11s
-      // c = 4; 6s
-      // c = 8; 6s
-      // c = 16; 7s
+        const data = tree.getNodeAttribute(node, "data");
+        if (data == undefined) throw "Fail.";
+        bar.start(tree.order, 1);
+        performance.mark("resolve-start");
 
-      const bar = new cliProgress.SingleBar(
-        {},
-        cliProgress.Presets.shades_classic
-      );
+        const series = await firstValueFrom(data);
+        bar.stop();
+        // Resolve tree.
+        performance.mark("resolve-end");
+        performance.measure("resolve", "resolve-start", "resolve-end");
 
-      bar.start(series.length, 0);
-
-      performance.mark("resolve-all-start");
-      const result = await firstValueFrom(
-        from(series).pipe(
-          mergeMap((d) => d, 16),
-          tap(() => {
-            bar.increment(1);
-          }),
-          toArray()
-        )
-      );
-      bar.stop();
-      performance.mark("resolve-all-end");
-
-      // console.log(performance.getEntriesByType("measure"));
-
-      console.log(
-        performance.measure(
-          "resolve-all",
-          "resolve-all-start",
-          "resolve-all-end"
-        )
-      );
-      console.log(result.map((table) => table.numRows));
+        console.table(cubeSeriesTable(series).toArray());
+        console.log(
+          performance.getEntriesByName("resolve", "measure").at(0)?.duration
+        );
+      }
     }
 
     await db.terminate();
+
+    console.log(
+      performance.getEntriesByName("CubeSeriesBuilder#withDates", "measure")
+    );
   }
 };
+
+function nodeByType<T, U extends NodeType>(
+  tree: Subtree<T>,
+  node: NodeId,
+  mustBeType: U
+): (TreeNode<T> & { type: U }) | undefined {
+  const exists = tree.hasNode(node);
+  if (!exists) return undefined;
+
+  const attributes = tree.getNodeAttributes(node);
+  if (attributes.type != mustBeType) {
+    throw `Not a '${mustBeType}' Node.`;
+  }
+
+  return attributes as TreeNode<T> & { type: U };
+}
+
+function outboundEdgesByType<T, U extends EdgeType>(
+  tree: Subtree<T>,
+  node: NodeId,
+  type: U
+): { [key: EdgeId]: Extract<TreeEdge, { type: U }> } {
+  const outboundEdges: { [key: EdgeId]: Extract<TreeEdge, { type: U }> } = {};
+  tree.forEachOutEdge(node, (edge, attributes) => {
+    if (attributes.type != type) return;
+    outboundEdges[edge] = attributes as Extract<TreeEdge, { type: U }>;
+  });
+  return outboundEdges;
+}
+
+function rxMetric(
+  artifacts: IArtifactReader,
+  tree: Subtree<CubeSeries>,
+  node: NodeId
+): Observable<CubeSeries> {
+  const attributes = nodeByType(tree, node, NodeType.Metric);
+
+  if (!attributes) return of(EmptyCubeSeries);
+
+  const series = artifacts.cubeSeries({
+    metricName: attributes.metricName,
+    timeGrain: attributes.timeGrain,
+    series: attributes.series
+  });
+
+  return series;
+}
+
+type OperatorInput = {
+  modifiers: SeriesModifier | undefined;
+  node: NodeId;
+  series: CubeSeries;
+};
+
+function rxOperator(
+  _artifacts: IArtifactReader,
+  tree: Subtree<CubeSeries>,
+  node: NodeId
+): Observable<CubeSeries> {
+  const attributes = nodeByType(tree, node, NodeType.Operator);
+  if (!attributes) return of(EmptyCubeSeries);
+
+  const children = outboundEdgesByType<CubeSeries, EdgeType.Arithmetic>(
+    tree,
+    node,
+    EdgeType.Arithmetic
+  );
+
+  const input: Observable<OperatorInput>[] = [];
+  for (const [edge, edgeAttributes] of Object.entries(children)) {
+    const [, node] = tree.extremities(edge);
+    const series = tree.getNodeAttribute(node, "data");
+
+    if (series == undefined) {
+      throw "Series is undefined.";
+    }
+
+    input.push(
+      combineLatest({
+        node: of(node),
+        series,
+        modifiers: of(edgeAttributes.modifiers)
+      })
+    );
+  }
+
+  const mathematicalOperator = attributes.operator;
+
+  return forkJoin(input).pipe(
+    // Calculate operator inputs.
+    map((input) => {
+      const flatDates = input.flatMap(({ series }) =>
+        readAttributeStartDates(series)
+      );
+      const dates = uniqueDates(flatDates).sort(compareAsc);
+      return { dates, input };
+    }),
+
+    // Transform operator inputs.
+    concatMap(({ dates, input }) => {
+      return from(input).pipe(
+        rxOperatorEnsureDates(dates),
+        rxOperatorApplyModifiers(),
+        toArray(),
+        map((input) => ({ dates, input }))
+      );
+    }),
+
+    // Apply arithmetic
+    concatMap(({ dates, input }) => {
+      const inputs: { [key: string]: CubeSeries } = {};
+      input.reduce((acc, { node, series }) => {
+        acc[node] = series;
+        return acc;
+      }, inputs);
+
+      const expression = input
+        .map((curr) => curr.node)
+        .join(` ${mathematicalOperator} `);
+
+      return of({ name: node, dates, expression, inputs }).pipe(
+        rxEvaluateFormula()
+      );
+    })
+  );
+}
+
+function rxValidateFormulaInputs(): MonoTypeOperatorFunction<{
+  name: string;
+  dates: Date[];
+  expression: string;
+  inputs: { [key: string]: CubeSeries };
+}> {
+  return (obs) => {
+    return obs.pipe(
+      tap(({ dates: ref, expression, inputs }) => {
+        {
+          // Check if the inputs have all the expression symbols.
+          const ast = MathJS.parse(expression);
+          ast.traverse((node) => {
+            if (!MathJS.isSymbolNode(node)) return;
+            if (inputs[node.name] == undefined) {
+              throw "Invalid input: Missing terms.";
+            }
+          });
+        }
+
+        {
+          const dates = [
+            ref,
+            ...Object.values(inputs).map(readAttributeStartDates)
+          ];
+          if (!dateArraysEqual(...dates)) {
+            console.warn(
+              `Invalid input: Dates do not match. (${dates.map((curr) => curr.length).join(", ")})`
+            );
+
+            throw "Invalid input: Dates do not match.";
+          }
+        }
+      })
+    );
+  };
+}
+
+function rxEvaluateFormula(): OperatorFunction<
+  {
+    name: string;
+    dates: Date[];
+    expression: string;
+    inputs: { [key: string]: CubeSeries };
+  },
+  CubeSeries
+> {
+  return (obs) =>
+    obs.pipe(
+      rxValidateFormulaInputs(),
+      map(({ name, dates: ref, expression, inputs }) => {
+        const expr = MathJS.compile(expression);
+
+        const values: (number | null)[] = [];
+        const dates: Date[] = [];
+        for (let r = 0; r < ref.length; r++) {
+          const scope = rowScope(inputs, r);
+          const date = ref[r];
+
+          let value: number | null;
+          if (Object.values(scope).includes(null)) {
+            value = null;
+          } else {
+            value = expr.evaluate(scope);
+          }
+
+          dates.push(date);
+          values.push(value);
+        }
+
+        return operatorSeries(name, dates, values);
+      })
+    );
+}
+
+function dateArraysEqual(...arr: Date[][]): boolean {
+  if (arr.length <= 1) return true;
+
+  const [first, ...rest] = arr;
+  for (const other of rest) {
+    if (first.length != other.length) return false;
+
+    const valuesEqual = first.every((date, i) => isEqual(date, other[i]));
+
+    if (!valuesEqual) return false;
+  }
+
+  return true;
+}
+
+function rxOperatorEnsureDates(
+  dates: Date[]
+): MonoTypeOperatorFunction<OperatorInput> {
+  return (obs) => {
+    return obs.pipe(
+      map(({ modifiers, node, series }) => {
+        const ensuredSeries = ensureDates(series, dates);
+
+        return {
+          modifiers,
+          node,
+          series: ensuredSeries
+        };
+      })
+    );
+  };
+}
+
+function rxOperatorApplyModifiers(): MonoTypeOperatorFunction<OperatorInput> {
+  return (obs) =>
+    obs.pipe(
+      map(({ modifiers, node, series }) => {
+        if (modifiers?.ifNull != undefined) {
+          series = replaceNullValue(series, modifiers.ifNull);
+        }
+        if (modifiers?.fill != undefined) {
+          throw "Not implemented";
+        }
+        return { modifiers, node, series };
+      })
+    );
+}
+
+function uniqueDates(arr: Date[]) {
+  const unique: Date[] = [];
+
+  const seen = new Set<number>();
+  for (const date of arr) {
+    const t = date.getTime();
+
+    if (seen.has(t)) continue;
+    unique.push(date);
+    seen.add(t);
+  }
+
+  return unique;
+}
