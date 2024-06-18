@@ -2,6 +2,7 @@ import { Attribute, AttributeValue, CubeTimeGrain } from "@trace/artifacts";
 import { MultiDirectedGraph } from "graphology";
 import { Attributes } from "graphology-types";
 import { Observable } from "rxjs";
+import { SeriesTransform } from "./types-transform";
 
 export enum ValueFormat {
   Unknown = "unknown",
@@ -24,19 +25,6 @@ export type SegmentDefinition = {
 };
 
 export type SeriesDefinition = (FixedSegmentDefinition | SegmentDefinition)[];
-
-/** Transform **/
-
-export enum SeriesTransformType {
-  Filter = "filter",
-  ReplaceValue = "replaceValue",
-  Timeshift = "timeshift",
-  AppendValues = "appendValues",
-  ReplaceAllValues = "replaceAllValues",
-  NegateValues = "negateValues"
-}
-
-export type SeriesTransform = { type: SeriesTransformType.Timeshift }[];
 
 /** Nodes **/
 

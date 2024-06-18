@@ -24,6 +24,7 @@ import { firstValueFrom, tap } from "rxjs";
 import { CommandModule } from "yargs";
 import { dirExists, must, printTable, spinner } from "../../lib";
 import { duckdb } from "../../lib/duckdb/duckdb.node";
+import { performanceTable } from "../outputs";
 import { promptNode, promptTree } from "../prompts";
 import { Trace } from "../trace";
 import { GenerateArtifactsArguments } from "./types";
@@ -156,9 +157,8 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
       bar.stop();
 
       console.table(cubeSeriesTable(series).toArray());
-      console.log(
-        performance.getEntriesByName("resolve", "measure").at(0)?.duration
-      );
+      console.log("\n");
+      performanceTable("resolve");
     }
 
     await db.terminate();

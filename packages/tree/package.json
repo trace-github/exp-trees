@@ -21,6 +21,7 @@
     "@trace/artifacts": "workspace:0.0.0-development",
     "@trace/common": "workspace:0.0.0-development",
     "apache-arrow": "^14",
+    "date-fns": "^3.6.0",
     "graphology": "^0.25.4",
     "graphology-traversal": "^0.3.1",
     "mathjs": "^12.4",
