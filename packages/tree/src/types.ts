@@ -84,7 +84,7 @@ export interface IOperatorNode<T> extends BaseNode<T> {
 export type TreeNode<T> = IMetricNode<T> | IOperatorNode<T> | IFormulaNode<T>;
 
 export type TreeNodeType<T, U extends NodeType = any> = Extract<
-  ReturnType<Tree<T>["getNodeAttributes"]>,
+  ReturnType<Subtree<T>["getNodeAttributes"]>,
   { type: U }
 >;
 
@@ -134,7 +134,7 @@ export type TreeEdge =
   | RelatedEdge;
 
 export type TreeEdgeType<T, U extends EdgeType = any> = Extract<
-  ReturnType<Tree<T>["getEdgeAttributes"]>,
+  ReturnType<Subtree<T>["getEdgeAttributes"]>,
   { type: U }
 >;
 

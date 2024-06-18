@@ -17,6 +17,7 @@
     "test": "jest",
     "typecheck": "tsc"
   },
-  "dependencies": {},
-  "devDependencies": {}
+  "dependencies": {
+    "date-fns": "^3.6.0"
+  }
 }

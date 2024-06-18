@@ -4,17 +4,27 @@ import {
   DuckDBBackedArtifactsReader,
   FileBackedConfig,
   GoogleCloudResourceReader,
+  cubeSeriesTable,
   initParquetCatalog
 } from "@trace/artifacts";
-import { Tree, initLegacyTrees, resolvingVisitor } from "@trace/tree";
+import { markAndMeasure } from "@trace/common";
+import {
+  NodeId,
+  Tree,
+  arithmeticTree,
+  initLegacyTrees,
+  resolvingVisitor,
+  rxMetric,
+  rxOperator
+} from "@trace/tree";
 import cliProgress from "cli-progress";
 import { MultiDirectedGraph } from "graphology";
 import os from "node:os";
-import { Observable, firstValueFrom, from, mergeMap, tap, toArray } from "rxjs";
+import { firstValueFrom, tap } from "rxjs";
 import { CommandModule } from "yargs";
 import { dirExists, must, printTable, spinner } from "../../lib";
 import { duckdb } from "../../lib/duckdb/duckdb.node";
-import { promptTree } from "../prompts";
+import { promptNode, promptTree } from "../prompts";
 import { Trace } from "../trace";
 import { GenerateArtifactsArguments } from "./types";
 
@@ -92,67 +102,63 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       tree.import(treeConfig.toJSON() as any);
 
+      const nodesWithTransforms: NodeId[] = [];
+      [...tree.nodeEntries()].forEach(({ node, attributes }) => {
+        if (attributes.transform && attributes.transform.length > 0) {
+          nodesWithTransforms.push(node);
+        }
+      });
+
       printTable(
-        ["label", "Time Grain", "# Nodes"],
-        [tree.getAttribute("label"), tree.getAttribute("timegrain"), tree.order]
+        ["label", "Time Grain", "# Nodes", "# Nodes w/ Transform"],
+        [
+          tree.getAttribute("label"),
+          tree.getAttribute("timegrain"),
+          tree.order,
+          nodesWithTransforms.length
+        ]
       );
       console.log("\n");
     }
 
-    // Resolve tree.
     {
-      const series: Observable<CubeSeries>[] = [];
+      const bar = new cliProgress.SingleBar({});
 
+      let at = 0;
       resolvingVisitor(tree, {
-        onMetricNode(_tree, _node, attributes) {
-          series.push(
-            artifacts.cubeSeries({
-              metricName: attributes.metricName,
-              timeGrain: attributes.timeGrain,
-              series: attributes.series
-            })
+        onMetricNode(tree, node) {
+          const obs = rxMetric(artifacts, tree, node).pipe(
+            tap(() => bar.update(at++, { name: node }))
           );
+          tree.setNodeAttribute(node, "data", obs);
+        },
+        onOperatorNode(tree, node) {
+          const obs = rxOperator(artifacts, tree, node).pipe(
+            tap(() => bar.update(at++, { name: node }))
+          );
+          tree.setNodeAttribute(node, "data", obs);
         }
       });
 
-      // 6-7s
-      // const result = await firstValueFrom(zip(series));
+      // Prompt which node to resolve.
+      const { node } = await promptNode(tree);
 
-      // c = 1; 11s
-      // c = 4; 6s
-      // c = 8; 6s
-      // c = 16; 7s
+      // TODO: Why (-1)? Check later.
+      bar.start(arithmeticTree(tree, node).order - 1, 0);
 
-      const bar = new cliProgress.SingleBar(
-        {},
-        cliProgress.Presets.shades_classic
-      );
+      const data = tree.getNodeAttribute(node, "data");
 
-      bar.start(series.length, 0);
+      if (data == undefined) throw "Fail.";
 
-      performance.mark("resolve-all-start");
-      const result = await firstValueFrom(
-        from(series).pipe(
-          mergeMap((d) => d, 16),
-          tap(() => {
-            bar.increment(1);
-          }),
-          toArray()
-        )
-      );
+      // Resolve node (within tree).
+      const series = await markAndMeasure("resolve", firstValueFrom(data));
+
       bar.stop();
-      performance.mark("resolve-all-end");
 
-      // console.log(performance.getEntriesByType("measure"));
-
+      console.table(cubeSeriesTable(series).toArray());
       console.log(
-        performance.measure(
-          "resolve-all",
-          "resolve-all-start",
-          "resolve-all-end"
-        )
+        performance.getEntriesByName("resolve", "measure").at(0)?.duration
       );
-      console.log(result.map((table) => table.numRows));
     }
 
     await db.terminate();
