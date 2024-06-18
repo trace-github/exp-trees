@@ -4,7 +4,6 @@ import {
   DuckDBBackedArtifactsReader,
   FileBackedConfig,
   GoogleCloudResourceReader,
-  cubeSeriesTable,
   initParquetCatalog
 } from "@trace/artifacts";
 import { markAndMeasure } from "@trace/common";
@@ -24,7 +23,7 @@ import { firstValueFrom, tap } from "rxjs";
 import { CommandModule } from "yargs";
 import { dirExists, must, printTable, spinner } from "../../lib";
 import { duckdb } from "../../lib/duckdb/duckdb.node";
-import { performanceTable } from "../outputs";
+import { printCubeSeries, printPerformanceTable } from "../outputs";
 import { promptNode, promptTree } from "../prompts";
 import { Trace } from "../trace";
 import { GenerateArtifactsArguments } from "./types";
@@ -156,9 +155,10 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
 
       bar.stop();
 
-      console.table(cubeSeriesTable(series).toArray());
       console.log("\n");
-      performanceTable("resolve");
+      printCubeSeries(series);
+      console.log("\n");
+      printPerformanceTable("resolve");
     }
 
     await db.terminate();

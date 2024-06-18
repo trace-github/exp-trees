@@ -41,7 +41,7 @@ export async function spinner<T>(
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function printTable(header: any[], ...rows: any[][]): void {
-  const table = new Table({ head: header });
+  const table = new Table({ head: header, wordWrap: true });
   table.push(...rows);
   console.log(table.toString());
   return;

@@ -1,7 +1,28 @@
+import { CubeSeries } from "@trace/artifacts";
+import { toUTCDateString } from "@trace/common";
 import { quantileSeq } from "mathjs";
 import { printTable } from "../lib";
 
-export function performanceTable(name: string): void {
+export function printCubeSeries(series: CubeSeries): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rows: any[] = new Array(series.numRows);
+
+  for (let r = 0; r < series.numRows; r++) {
+    const row = series.get(r);
+
+    if (row == null) continue;
+
+    rows[r] = [
+      toUTCDateString(row.a.start),
+      row.cnt == null ? "NULL" : row.cnt,
+      row.value == null ? "NULL" : row.value
+    ];
+  }
+
+  printTable(["date", "cnt", "value"], ...rows);
+}
+
+export function printPerformanceTable(name: string): void {
   const measurements = performance.getEntriesByName(name, "measure");
 
   const durations = measurements.map(({ duration }) => duration);

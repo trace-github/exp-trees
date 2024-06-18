@@ -1,5 +1,4 @@
 import * as Arrow from "apache-arrow";
-import { formatISO } from "date-fns";
 import { Attribute, AttributeValue } from "./types";
 import { AttributeStruct, CubeSeries, CubeSeriesSchema } from "./types-schema";
 
@@ -110,17 +109,4 @@ export function cubeSeriesFromArrays(
     name: nameBuilder.toVector(),
     value: valueBuilder.toVector()
   });
-}
-
-export function cubeSeriesTable(series: CubeSeries): Arrow.Table {
-  const json: { [key: string]: any }[] = [];
-
-  for (let r = 0; r < series.numRows; r++) {
-    const row = series.get(r);
-    json.push({
-      start: row?.a.start ? formatISO(row.a.start) : null,
-      value: row?.value
-    });
-  }
-  return Arrow.tableFromJSON(json);
 }
