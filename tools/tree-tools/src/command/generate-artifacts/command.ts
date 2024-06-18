@@ -7,9 +7,11 @@ import {
   cubeSeriesTable,
   initParquetCatalog
 } from "@trace/artifacts";
+import { markAndMeasure } from "@trace/common";
 import {
   NodeId,
   Tree,
+  arithmeticTree,
   initLegacyTrees,
   resolvingVisitor,
   rxMetric,
@@ -119,9 +121,9 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
       console.log("\n");
     }
 
-    const bar = new cliProgress.SingleBar({});
-
     {
+      const bar = new cliProgress.SingleBar({});
+
       let at = 0;
       resolvingVisitor(tree, {
         onMetricNode(tree, node) {
@@ -138,31 +140,27 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
         }
       });
 
-      {
-        const { node } = await promptNode(tree);
+      // Prompt which node to resolve.
+      const { node } = await promptNode(tree);
 
-        const data = tree.getNodeAttribute(node, "data");
-        if (data == undefined) throw "Fail.";
-        bar.start(tree.order, 1);
-        performance.mark("resolve-start");
+      // TODO: Why (-1)? Check later.
+      bar.start(arithmeticTree(tree, node).order - 1, 0);
 
-        const series = await firstValueFrom(data);
-        bar.stop();
-        // Resolve tree.
-        performance.mark("resolve-end");
-        performance.measure("resolve", "resolve-start", "resolve-end");
+      const data = tree.getNodeAttribute(node, "data");
 
-        console.table(cubeSeriesTable(series).toArray());
-        console.log(
-          performance.getEntriesByName("resolve", "measure").at(0)?.duration
-        );
-      }
+      if (data == undefined) throw "Fail.";
+
+      // Resolve node (within tree).
+      const series = await markAndMeasure("resolve", firstValueFrom(data));
+
+      bar.stop();
+
+      console.table(cubeSeriesTable(series).toArray());
+      console.log(
+        performance.getEntriesByName("resolve", "measure").at(0)?.duration
+      );
     }
 
     await db.terminate();
-
-    console.log(
-      performance.getEntriesByName("CubeSeriesBuilder#withDates", "measure")
-    );
   }
 };
