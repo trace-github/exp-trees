@@ -72,7 +72,7 @@ export function promptNode<T>(
     initial: rootNode(target),
     choices: ordered.map(({ node, attributes, depth }) => {
       return {
-        title: `${attributes.label} [${depth}]`,
+        title: `${attributes.label} ${`${depth}`.padStart(60 - attributes.label.length, " ")}`,
         value: node
       };
     })

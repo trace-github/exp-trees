@@ -1,33 +1,7 @@
 import * as Arrow from "apache-arrow";
-import { isBefore, isEqual } from "date-fns";
-import {
-  readAttributeFields,
-  readAttributeStartDates,
-  readName
-} from "./attributes";
+import { formatISO } from "date-fns";
+import { Attribute, AttributeValue } from "./types";
 import { AttributeStruct, CubeSeries, CubeSeriesSchema } from "./types-schema";
-
-export function findIndexForEqualDate(sortedDates: Date[], dateToFind: Date) {
-  let left = 0;
-  let right = sortedDates.length - 1;
-
-  while (left <= right) {
-    const middle = Math.floor((left + right) / 2);
-    const middleDate = sortedDates[middle];
-
-    if (isEqual(middleDate, dateToFind)) {
-      return middle;
-    }
-
-    if (isBefore(middleDate, dateToFind)) {
-      left = middle + 1;
-    } else {
-      right = middle - 1;
-    }
-  }
-
-  return -1;
-}
 
 export class CubeSeriesBuilder {
   private readonly nameBuilder: Arrow.Utf8Builder;
@@ -61,31 +35,9 @@ export class CubeSeriesBuilder {
   }
 
   public add(
-    row: ReturnType<Arrow.StructRow<CubeSeriesSchema>["toJSON"]> | null
-  ): void {
-    if (row == null) return;
-
-    this.attributeBuilder.append(row.a.toJSON());
-
-    if (row.cnt == null) {
-      this.countBuilder.append(null);
-    } else {
-      this.countBuilder.append(Number(row.cnt));
-    }
-
-    this.nameBuilder.append(this.name);
-
-    if (row.value == null) {
-      this.valueBuilder.append(null);
-    } else {
-      this.valueBuilder.append(Number(row.value)); // ?
-    }
-  }
-
-  public add2(
-    a: { start: Date; [key: string]: any },
-    cnt: number | null,
-    value: number | null
+    a: { start: Date; [key: string]: unknown },
+    cnt: bigint | number | null,
+    value: bigint | number | null
   ): void {
     this.nameBuilder.append(this.name);
 
@@ -114,69 +66,11 @@ export class CubeSeriesBuilder {
   }
 }
 
-export function ensureDates(
-  target: CubeSeries,
-  dates: Date[],
-  name: string = readName(target)
-) {
-  const builder = new CubeSeriesBuilder(
-    name,
-    readAttributeFields(target.schema)
-  );
-  const firstRow = target.get(0);
-
-  const starts = readAttributeStartDates(target);
-
-  if (firstRow == null) return builder.build();
-
-  for (const start of dates) {
-    const rowIdx = findIndexForEqualDate(starts, start);
-
-    if (rowIdx == -1) {
-      builder.add2({ ...firstRow.a.toJSON(), start }, null, null);
-    } else {
-      const row = target.get(rowIdx);
-
-      if (!row) throw "x";
-
-      builder.add({
-        a: row.a,
-        cnt: row.cnt,
-        name: row.name,
-        value: row.value
-      });
-    }
-  }
-
-  const series = builder.build();
-
-  return series;
-}
-
-export function replaceNullValue(
-  target: CubeSeries,
-  value: number,
-  name: string = readName(target)
-): CubeSeries {
-  const builder = new CubeSeriesBuilder(
-    name,
-    readAttributeFields(target.schema)
-  );
-
-  for (let r = 0; r < target.numRows; r++) {
-    const row = target.get(r);
-    if (row == null) continue;
-    if (row.value == null) row.value = value;
-    builder.add(row);
-  }
-
-  return builder.build();
-}
-
-export function operatorSeries(
+export function cubeSeriesFromArrays(
   name: string,
   dates: Date[],
-  values: (number | null)[]
+  values: (number | null)[],
+  otherAttributes: { [key: Attribute]: AttributeValue } = {}
 ): CubeSeries {
   if (dates.length != values.length) {
     throw "Dates array length must equal values array length.";
@@ -204,7 +98,7 @@ export function operatorSeries(
     const start = dates[r];
     const value = values[r];
 
-    attributeBuilder.append({ start });
+    attributeBuilder.append({ ...otherAttributes, start });
     countBuilder.append(null);
     nameBuilder.append(name);
     valueBuilder.append(value);
@@ -223,7 +117,10 @@ export function cubeSeriesTable(series: CubeSeries): Arrow.Table {
 
   for (let r = 0; r < series.numRows; r++) {
     const row = series.get(r);
-    json.push({ start: row?.a.start, value: row?.value });
+    json.push({
+      start: row?.a.start ? formatISO(row.a.start) : null,
+      value: row?.value
+    });
   }
   return Arrow.tableFromJSON(json);
 }

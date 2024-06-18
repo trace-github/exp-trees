@@ -100,19 +100,32 @@ importers:
         specifier: ^1.1.0
         version: 1.1.0
 
-  packages/common: {}
+  packages/common:
+    dependencies:
+      date-fns:
+        specifier: ^3.6.0
+        version: 3.6.0
 
   packages/tree:
     dependencies:
       '@trace/artifacts':
         specifier: workspace:0.0.0-development
         version: link:../artifacts
+      '@trace/common':
+        specifier: workspace:0.0.0-development
+        version: link:../common
+      apache-arrow:
+        specifier: ^14
+        version: 14.0.2
       graphology:
         specifier: ^0.25.4
         version: 0.25.4(graphology-types@0.24.7)
       graphology-traversal:
         specifier: ^0.3.1
         version: 0.3.1(graphology-types@0.24.7)
+      mathjs:
+        specifier: ^12.4
+        version: 12.4.3
       rxjs:
         specifier: ^7.8.1
         version: 7.8.1
@@ -135,6 +148,9 @@ importers:
       '@trace/artifacts':
         specifier: workspace:0.0.0-development
         version: link:../../packages/artifacts
+      '@trace/common':
+        specifier: workspace:0.0.0-development
+        version: link:../../packages/common
       '@trace/tree':
         specifier: workspace:0.0.0-development
         version: link:../../packages/tree
