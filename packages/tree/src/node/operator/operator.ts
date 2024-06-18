@@ -15,6 +15,7 @@ import {
   of,
   toArray
 } from "rxjs";
+import { rxCubeSeriesTransform } from "../../transform/transform";
 import { nodeByType, outboundEdgesByType } from "../../tree";
 import { EdgeType, NodeId, NodeType, Subtree } from "../../types";
 import { rxEvaluateExpression } from "../evaluate";
@@ -30,7 +31,10 @@ export function rxOperator(
   node: NodeId
 ): Observable<CubeSeries> {
   const attributes = nodeByType(tree, node, NodeType.Operator);
+
   if (!attributes) return of(EmptyCubeSeries);
+
+  const { metricName, operator, transform = [] } = attributes;
 
   const children = outboundEdgesByType<CubeSeries, EdgeType.Arithmetic>(
     tree,
@@ -75,7 +79,7 @@ export function rxOperator(
         map((input) => {
           const expression = input
             .map((curr) => curr.node)
-            .join(` ${attributes.operator} `);
+            .join(` ${operator} `);
           const inputs = input.reduce(
             (acc, { node, series }) => {
               acc[node] = series;
@@ -91,6 +95,9 @@ export function rxOperator(
     }),
 
     // Calculate operator
-    rxEvaluateExpression()
+    rxEvaluateExpression(),
+
+    // Apply series transforms
+    rxCubeSeriesTransform(metricName, transform)
   );
 }

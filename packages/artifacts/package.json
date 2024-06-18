@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@duckdb/duckdb-wasm": "1.28.1-dev106.0",
+    "@js-temporal/polyfill": "^0.4.4",
     "@trace/common": "workspace:0.0.0-development",
     "apache-arrow": "^14",
     "date-fns": "^3.6.0",

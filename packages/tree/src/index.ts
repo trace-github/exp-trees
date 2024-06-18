@@ -5,4 +5,5 @@ export * from "./segmentation";
 export * from "./tree";
 export * from "./types";
 export * from "./types-resource";
+export * from "./types-transform";
 export * from "./visitor";

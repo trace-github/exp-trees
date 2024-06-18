@@ -18,6 +18,8 @@
     "typecheck": "tsc"
   },
   "dependencies": {
-    "date-fns": "^3.6.0"
+    "@js-temporal/polyfill": "^0.4.4",
+    "date-fns": "^3.6.0",
+    "loglevel": "^1.9.1"
   }
 }
