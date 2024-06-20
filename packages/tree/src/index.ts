@@ -1,3 +1,4 @@
+export * from "./analysis";
 export * from "./arithmetic";
 export * from "./legacy";
 export * from "./node";
