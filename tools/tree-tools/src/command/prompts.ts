@@ -1,4 +1,5 @@
 import { CubeTimeGrain } from "@trace/artifacts";
+import { toUTCDateString } from "@trace/common";
 import {
   ITreeClient,
   NodeId,
@@ -76,5 +77,26 @@ export function promptNode<T>(
         value: node
       };
     })
+  });
+}
+
+export async function promptDates(input: Date[] | Promise<Date[]>) {
+  let dates: Date[];
+  if (input instanceof Promise) {
+    dates = await input;
+  } else {
+    dates = input;
+  }
+
+  return prompts({
+    type: "multiselect",
+    name: "dates",
+    min: 1,
+    max: 2,
+    message: "Pick a two dates",
+    choices: dates.map((curr) => ({
+      title: toUTCDateString(curr),
+      value: curr
+    }))
   });
 }

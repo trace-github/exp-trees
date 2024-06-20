@@ -9,5 +9,7 @@ export class AnalysisError extends Error {
 
   public static MissingEdge = new AnalysisError("Missing edge.");
 
+  public static UnexpectedEdgeType = new AnalysisError("Unexpected edge type.");
+
   public static MissingNode = new AnalysisError("Missing node.");
 }

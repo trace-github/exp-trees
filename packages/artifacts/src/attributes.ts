@@ -37,9 +37,8 @@ export function readAttributeStartDates(
   const attributes = table.getChild("a");
   if (!attributes) return [];
 
-  const rows = table.getChild("a")?.toArray() ?? [];
-
   const starts: Date[] = [];
+  const rows = table.getChild("a")?.toArray() ?? [];
   for (const row of rows) {
     starts.push(row.start);
   }

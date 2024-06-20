@@ -1,35 +1,34 @@
 import { CubeSeries } from "@trace/artifacts";
 import { compareAsc } from "date-fns";
-import { Observable, combineLatest, map } from "rxjs";
+import { Observable, combineLatest, defer, map } from "rxjs";
 import { sampleCorrelation } from "simple-statistics";
 import {
   ComparisonResult,
   CorrelationAnalysisType,
+  EdgeId,
   EdgeType,
-  NodeId,
   Subtree,
   Tree,
   ValueFormat
 } from "../../types";
 import { AnalysisError } from "../errors";
+import { edgeData } from "../utils";
 
 export function correlationEdgeAttributes(
   tree: Tree<CubeSeries> | Subtree<CubeSeries>,
-  [source, target]: [NodeId, NodeId],
+  edge: EdgeId,
   config$: Observable<[Date, Date]>
 ): {
   type: EdgeType.Analysis;
   analysis: CorrelationAnalysisType.Correlation;
   data: Observable<ComparisonResult<number>>;
 } {
-  if (!tree.hasNode(source)) throw AnalysisError.MissingNode;
+  const {
+    sourceAttributes: { data: source$ },
+    targetAttributes: { data: target$ }
+  } = edgeData(tree, edge);
 
-  const source$ = tree.getNodeAttribute(source, "data");
   if (source$ == undefined) throw AnalysisError.InvalidSeries;
-
-  if (!tree.hasNode(target)) throw AnalysisError.MissingNode;
-
-  const target$ = tree.getNodeAttribute(target, "data");
   if (target$ == undefined) throw AnalysisError.InvalidSeries;
 
   const data$ = combineLatest({
@@ -91,6 +90,6 @@ export function correlationEdgeAttributes(
   return {
     type: EdgeType.Analysis,
     analysis: CorrelationAnalysisType.Correlation,
-    data: data$ as Observable<ComparisonResult<number>>
+    data: defer(() => data$)
   };
 }

@@ -8,24 +8,41 @@ import {
 } from "@trace/artifacts";
 import { markAndMeasure } from "@trace/common";
 import {
+  CorrelationAnalysisType,
+  EdgeType,
+  GrowthRateAnalysisType,
   NodeId,
   Tree,
   arithmeticTree,
   correlationEdgeAttributes,
+  edgesByType,
+  growthRateForEdgeType,
   initLegacyTrees,
   resolvingVisitor,
   rxMetric,
-  rxOperator
+  rxOperator,
+  treeDates
 } from "@trace/tree";
+import * as Arrow from "apache-arrow";
 import cliProgress from "cli-progress";
 import { MultiDirectedGraph } from "graphology";
 import os from "node:os";
-import { ReplaySubject, Subject, firstValueFrom, tap } from "rxjs";
+import {
+  Observable,
+  ReplaySubject,
+  Subject,
+  combineLatest,
+  firstValueFrom,
+  map,
+  of,
+  tap,
+  zip
+} from "rxjs";
 import { CommandModule } from "yargs";
 import { dirExists, must, printTable, spinner } from "../../lib";
 import { duckdb } from "../../lib/duckdb/duckdb.node";
 import { printCubeSeries, printPerformanceTable } from "../outputs";
-import { promptNode, promptTree } from "../prompts";
+import { promptDates, promptNode, promptTree } from "../prompts";
 import { Trace } from "../trace";
 import { GenerateArtifactsArguments } from "./types";
 
@@ -144,16 +161,34 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
         },
 
         onArithmeticEdge(tree, edge) {
-          const [source, target] = tree.extremities(edge);
+          {
+            // Add Correlation Analysis
+            const attributes = correlationEdgeAttributes(tree, edge, config$);
+            const [source, target] = tree.extremities(edge);
+            tree.addDirectedEdge(source, target, attributes);
+          }
 
           {
-            // Add correlation edge
-            const attributes = correlationEdgeAttributes(
-              tree,
-              [source, target],
-              config$
-            );
+            // Add Growth Rate Analysis
+            const fn = growthRateForEdgeType[EdgeType.Arithmetic];
+            const [source, target] = tree.extremities(edge);
+            tree.addDirectedEdge(source, target, fn(tree, edge, config$));
+          }
+        },
+
+        onSegmentationEdge(tree, edge) {
+          {
+            // Add Correlation Analysis
+            const attributes = correlationEdgeAttributes(tree, edge, config$);
+            const [source, target] = tree.extremities(edge);
             tree.addDirectedEdge(source, target, attributes);
+          }
+
+          {
+            // Add Growth Rate Analysis
+            const fn = growthRateForEdgeType[EdgeType.Segmentation];
+            const [source, target] = tree.extremities(edge);
+            tree.addDirectedEdge(source, target, fn(tree, edge, config$));
           }
         }
       });
@@ -175,9 +210,57 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
 
       console.log("\n");
       printCubeSeries(series);
+      printPerformanceTable("resolve");
+
+      {
+        const { dates } = await promptDates(firstValueFrom(treeDates(tree)));
+
+        // console.log(dates);
+        const analysisEdgeMap = edgesByType(tree, EdgeType.Analysis);
+
+        const data: Observable<{
+          source: NodeId;
+          target: NodeId;
+          type: string;
+          value: number | null;
+        }>[] = [];
+        for (const [edge, attributes] of Object.entries(analysisEdgeMap)) {
+          const [source, target] = tree.extremities(edge);
+
+          if (
+            attributes.analysis != CorrelationAnalysisType.Correlation &&
+            attributes.analysis != GrowthRateAnalysisType.GrowthRate
+          ) {
+            continue;
+          }
+
+          data.push(
+            combineLatest({
+              source: of(source),
+              target: of(target),
+              type: of(attributes.analysis),
+              value: attributes.data.pipe(
+                map((result) => {
+                  return result.value;
+                })
+              )
+            })
+          );
+        }
+
+        config$.next(dates);
+
+        const table = await markAndMeasure(
+          "resolve-analysis",
+          firstValueFrom(zip(data))
+        );
+
+        console.table(Arrow.tableFromJSON(table).toArray());
+      }
 
       console.log("\n");
-      printPerformanceTable("resolve");
+
+      printPerformanceTable("resolve-analysis");
     }
 
     await db.terminate();

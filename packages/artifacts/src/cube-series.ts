@@ -1,4 +1,6 @@
+import { findIndexForEqualDate } from "@trace/common";
 import * as Arrow from "apache-arrow";
+import { readAttributeStartDates } from "./attributes";
 import { Attribute, AttributeValue } from "./types";
 import { AttributeStruct, CubeSeries, CubeSeriesSchema } from "./types-schema";
 
@@ -109,4 +111,24 @@ export function cubeSeriesFromArrays(
     name: nameBuilder.toVector(),
     value: valueBuilder.toVector()
   });
+}
+
+/**
+ * Finds the value in a CubeSeries for a specified date.
+ *
+ * @param series - The CubeSeries object which contains the data. The dates in
+ * the series should be sorted in ascending order.
+ * @param target - The target date for which to find the corresponding value
+ * in the series.
+ * @returns The value associated with the target date in the CubeSeries, or
+ * `null` if the date is not found.
+ */
+export function findCubeSeriesValueAtDate(series: CubeSeries, target: Date) {
+  // CubeSeries dates should be sorted ASC
+  const starts = readAttributeStartDates(series);
+  const idx = findIndexForEqualDate(starts, target);
+
+  if (idx == -1) return null;
+
+  return series.get(idx)?.value ?? null;
 }

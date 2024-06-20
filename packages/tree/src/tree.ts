@@ -1,3 +1,4 @@
+import { CubeSeries } from "@trace/artifacts";
 import Graph from "graphology";
 import { subgraph } from "graphology-operators";
 import { bfsFromNode } from "graphology-traversal";
@@ -9,7 +10,8 @@ import {
   Subtree,
   Tree,
   TreeEdge,
-  TreeNode
+  TreeNode,
+  TreeNodeType
 } from "./types";
 
 /**
@@ -49,6 +51,7 @@ export function subtree<T>(tree: Tree<T> | Subtree<T>, startNode: NodeId) {
 
 /**
  * Gets a node by type from the tree.
+ *
  * @param tree The tree to search within.
  * @param node The ID of the node to retrieve.
  * @param mustBeType The type the node must be.
@@ -72,7 +75,57 @@ export function nodeByType<T, U extends NodeType>(
 }
 
 /**
+ * Gets a node by type from the tree.
+ * @param tree The tree to search within.
+ * @param mustBeType The type the node must be.
+ * @returns The node if found and of the correct type, otherwise undefined.
+ */
+export function nodesByType<U extends NodeType>(
+  tree: Subtree<CubeSeries>,
+  mustBeType: U
+): Record<NodeId, Extract<TreeNodeType<CubeSeries>, { type: U }>> {
+  const nodes: Record<
+    NodeId,
+    Extract<TreeNodeType<CubeSeries>, { type: U }>
+  > = {};
+
+  tree.forEachNode((node, attributes) => {
+    if (attributes.type === mustBeType) {
+      nodes[node] = attributes as Extract<
+        TreeNodeType<CubeSeries>,
+        { type: U }
+      >;
+    }
+  });
+
+  return nodes;
+}
+
+/**
+ * Gets all edges of a specific type in the tree.
+ *
+ * @param tree The tree to search within.
+ * @param type The type of edges to retrieve.
+ * @returns A dictionary of edge IDs to edge attributes.
+ */
+export function edgesByType<T, U extends EdgeType>(
+  tree: Subtree<T>,
+  type: U
+): Record<EdgeId, Extract<TreeEdge, { type: U }>> {
+  const edges: Record<EdgeId, Extract<TreeEdge, { type: U }>> = {};
+
+  tree.forEachOutEdge((edge, attributes) => {
+    if (attributes.type === type) {
+      edges[edge] = attributes as Extract<TreeEdge, { type: U }>;
+    }
+  });
+
+  return edges;
+}
+
+/**
  * Gets outbound edges of a specific type from a node in the tree.
+ *
  * @param tree The tree to search within.
  * @param node The ID of the node to get edges from.
  * @param type The type of edges to retrieve.
