@@ -1,5 +1,6 @@
 import { findIndexForEqualDate } from "@trace/common";
 import * as Arrow from "apache-arrow";
+import { compareAsc } from "date-fns";
 import { readAttributeStartDates } from "./attributes";
 import { Attribute, AttributeValue } from "./types";
 import { AttributeStruct, CubeSeries, CubeSeriesSchema } from "./types-schema";
@@ -126,9 +127,15 @@ export function cubeSeriesFromArrays(
 export function findCubeSeriesValueAtDate(series: CubeSeries, target: Date) {
   // CubeSeries dates should be sorted ASC
   const starts = readAttributeStartDates(series);
-  const idx = findIndexForEqualDate(starts, target);
+  const idx = findIndexForEqualDate(starts.sort(compareAsc), target);
 
   if (idx == -1) return null;
 
-  return series.get(idx)?.value ?? null;
+  const row = series.get(idx);
+
+  if (row == null) return null;
+
+  if (row.value == null) return null;
+
+  return Number(row.value);
 }

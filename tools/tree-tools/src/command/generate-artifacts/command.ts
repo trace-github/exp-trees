@@ -23,6 +23,7 @@ import {
   rxOperator,
   treeDates
 } from "@trace/tree";
+// @ts-expect-error "something up with arrow"
 import * as Arrow from "apache-arrow";
 import cliProgress from "cli-progress";
 import { MultiDirectedGraph } from "graphology";
@@ -31,10 +32,8 @@ import {
   Observable,
   ReplaySubject,
   Subject,
-  combineLatest,
   firstValueFrom,
   map,
-  of,
   tap,
   zip
 } from "rxjs";
@@ -176,7 +175,8 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
           }
         },
 
-        onSegmentationEdge(tree, edge) {
+        onSegmentationEdge(tree, edge, attributes) {
+          console.log(attributes.type);
           {
             // Add Correlation Analysis
             const attributes = correlationEdgeAttributes(tree, edge, config$);
@@ -215,14 +215,13 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
       {
         const { dates } = await promptDates(firstValueFrom(treeDates(tree)));
 
-        // console.log(dates);
         const analysisEdgeMap = edgesByType(tree, EdgeType.Analysis);
-
-        const data: Observable<{
+        const analysis$: Observable<{
           source: NodeId;
           target: NodeId;
           type: string;
           value: number | null;
+          format: string;
         }>[] = [];
         for (const [edge, attributes] of Object.entries(analysisEdgeMap)) {
           const [source, target] = tree.extremities(edge);
@@ -234,17 +233,19 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
             continue;
           }
 
-          data.push(
-            combineLatest({
-              source: of(source),
-              target: of(target),
-              type: of(attributes.analysis),
-              value: attributes.data.pipe(
-                map((result) => {
-                  return result.value;
-                })
-              )
-            })
+          const sourceLabel = tree.getNodeAttribute(source, "label");
+          const targetLabel = tree.getNodeAttribute(target, "label");
+
+          analysis$.push(
+            attributes.data.pipe(
+              map((result) => ({
+                source: sourceLabel,
+                target: targetLabel,
+                type: attributes.analysis,
+                value: result.value,
+                format: result.format
+              }))
+            )
           );
         }
 
@@ -252,7 +253,7 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
 
         const table = await markAndMeasure(
           "resolve-analysis",
-          firstValueFrom(zip(data))
+          firstValueFrom(zip(analysis$))
         );
 
         console.table(Arrow.tableFromJSON(table).toArray());

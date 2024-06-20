@@ -1,8 +1,30 @@
 import { CubeSeries, findCubeSeriesValueAtDate } from "@trace/artifacts";
 import { Observable, combineLatest, map } from "rxjs";
-import { ComparisonResult, ValueFormat } from "../../types";
+import { ComparisonResult, ValueFormat } from "../types";
 
-export function calculateGrowthRate(
+export function rxMetricGrowthRate(
+  config$: Observable<[Date, Date]>,
+  series$: Observable<CubeSeries>
+): Observable<ComparisonResult<number>> {
+  return combineLatest({
+    config: config$,
+    series: series$
+  }).pipe(
+    map(({ series, config: [before, after] }) => {
+      const x_t0 = findCubeSeriesValueAtDate(series, before);
+      const x_t1 = findCubeSeriesValueAtDate(series, after);
+
+      return {
+        before,
+        after,
+        value: calculateGrowthRate(x_t0, x_t1),
+        format: ValueFormat.Percent
+      };
+    })
+  );
+}
+
+function calculateGrowthRate(
   before: number | null,
   after: number | null,
   options: {
@@ -23,25 +45,4 @@ export function calculateGrowthRate(
     // divide by zero but has a change
     return after / subDenomZero;
   }
-}
-
-export function rxGrowthRate(
-  config$: Observable<[Date, Date]>,
-  series$: Observable<CubeSeries>
-): Observable<ComparisonResult<number>> {
-  return combineLatest({
-    config: config$,
-    series: series$
-  }).pipe(
-    map(({ series, config: [before, after] }) => {
-      const x_t0 = findCubeSeriesValueAtDate(series, before);
-      const x_t1 = findCubeSeriesValueAtDate(series, after);
-      return {
-        before,
-        after,
-        value: calculateGrowthRate(x_t0, x_t1),
-        format: ValueFormat.Percent
-      };
-    })
-  );
 }

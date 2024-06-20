@@ -12,4 +12,6 @@ export class AnalysisError extends Error {
   public static UnexpectedEdgeType = new AnalysisError("Unexpected edge type.");
 
   public static MissingNode = new AnalysisError("Missing node.");
+
+  public static UnexpectedNodeType = new AnalysisError("Unexpected node type.");
 }

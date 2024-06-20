@@ -10,6 +10,7 @@ import {
   Subtree,
   Tree,
   TreeEdge,
+  TreeEdgeType,
   TreeNode,
   TreeNodeType
 } from "./types";
@@ -145,4 +146,29 @@ export function outboundEdgesByType<T, U extends EdgeType>(
   });
 
   return outboundEdges;
+}
+
+export function hasIncomingEdgeOfType<T, U extends EdgeType>(
+  tree: Subtree<T>,
+  node: NodeId,
+  mustBeOfType: U
+): boolean {
+  return Object.keys(outboundEdgesByType(tree, node, mustBeOfType)).length > 0;
+}
+
+export function edgeIndexByType(
+  tree: Tree<unknown>,
+  edge: EdgeId,
+  type: EdgeType
+) {
+  const [source] = tree.extremities(edge);
+  const edges = Object.keys(outboundEdgesByType(tree, source, type));
+  return [edges.indexOf(edge), edges.length];
+}
+
+export function isEdgeType<T, U extends EdgeType>(
+  attributes: TreeEdgeType<T>,
+  mustBeType: U
+): attributes is TreeEdgeType<T, U> {
+  return attributes.type == mustBeType;
 }
