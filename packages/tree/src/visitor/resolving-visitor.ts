@@ -3,7 +3,7 @@ import { bfsFromNode } from "graphology-traversal";
 import { arithmeticTree } from "../arithmetic";
 import { segmentationTree } from "../segmentation";
 import { rootNode, subtree } from "../tree";
-import { ArithmeticTree, EdgeType, NodeType, Subtree, Tree } from "../types";
+import { EdgeType, NodeId, NodeType, Subtree, Tree } from "../types";
 import { TreeVisitorError } from "./errors";
 import { ITreeVisitor } from "./types";
 
@@ -26,8 +26,7 @@ export function resolvingVisitor<T>(
   const segmentsRoot = rootNode(segments);
 
   bfsFromNode(segments, segmentsRoot, (node) => {
-    const arithmetic = arithmeticTree(tree, node);
-    resolveArithmeticTreeVisitor(arithmetic, visitor);
+    resolveArithmeticTreeVisitor(tree, node, visitor);
 
     segments.forEachInboundEdge(node, (edge, attributes) => {
       visitor.onSegmentationEdge?.(tree, edge, attributes);
@@ -37,6 +36,10 @@ export function resolvingVisitor<T>(
   // Finally, resolve other types of edges + nodes
   tree.forEachDirectedEdge((edge, attributes, _source, target) => {
     switch (attributes.type) {
+      case EdgeType.Analysis:
+        // ignore
+        break;
+
       case EdgeType.Arithmetic:
       case EdgeType.Segmentation:
         // Ignore. Already visited.
@@ -66,10 +69,13 @@ export function resolvingVisitor<T>(
  * @param visitor The visitor for handling specific node and edge types.
  */
 function resolveArithmeticTreeVisitor<T>(
-  tree: ArithmeticTree<T>,
+  tree: Subtree<T>,
+  node: NodeId,
   visitor: ITreeVisitor<T>
 ) {
-  const topo = topologicalSort(tree);
+  const arithmetic = arithmeticTree(tree, node);
+
+  const topo = topologicalSort(arithmetic);
   for (const node of topo.reverse()) {
     const attributes = tree.getNodeAttributes(node);
 
@@ -91,7 +97,10 @@ function resolveArithmeticTreeVisitor<T>(
     }
 
     tree.forEachOutboundEdge(node, (edge, attributes) => {
-      visitor.onArithmeticEdge?.(tree, edge, attributes);
+      switch (attributes.type) {
+        case EdgeType.Arithmetic:
+          visitor.onArithmeticEdge?.(tree, edge, attributes);
+      }
     });
   }
 }

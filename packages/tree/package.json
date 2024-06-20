@@ -25,7 +25,8 @@
     "graphology": "^0.25.4",
     "graphology-traversal": "^0.3.1",
     "mathjs": "^12.4",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "simple-statistics": "^7.8.3"
   },
   "devDependencies": {
     "graphology-dag": "^0.4.1",

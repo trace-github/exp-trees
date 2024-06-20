@@ -11,6 +11,7 @@ import {
   NodeId,
   Tree,
   arithmeticTree,
+  correlationEdgeAttributes,
   initLegacyTrees,
   resolvingVisitor,
   rxMetric,
@@ -19,7 +20,7 @@ import {
 import cliProgress from "cli-progress";
 import { MultiDirectedGraph } from "graphology";
 import os from "node:os";
-import { firstValueFrom, tap } from "rxjs";
+import { ReplaySubject, Subject, firstValueFrom, tap } from "rxjs";
 import { CommandModule } from "yargs";
 import { dirExists, must, printTable, spinner } from "../../lib";
 import { duckdb } from "../../lib/duckdb/duckdb.node";
@@ -121,6 +122,8 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
       console.log("\n");
     }
 
+    const config$: Subject<[Date, Date]> = new ReplaySubject(1);
+
     {
       const bar = new cliProgress.SingleBar({});
 
@@ -132,11 +135,26 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
           );
           tree.setNodeAttribute(node, "data", obs);
         },
+
         onOperatorNode(tree, node) {
           const obs = rxOperator(artifacts, tree, node).pipe(
             tap(() => bar.update(at++, { name: node }))
           );
           tree.setNodeAttribute(node, "data", obs);
+        },
+
+        onArithmeticEdge(tree, edge) {
+          const [source, target] = tree.extremities(edge);
+
+          {
+            // Add correlation edge
+            const attributes = correlationEdgeAttributes(
+              tree,
+              [source, target],
+              config$
+            );
+            tree.addDirectedEdge(source, target, attributes);
+          }
         }
       });
 
@@ -157,6 +175,7 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
 
       console.log("\n");
       printCubeSeries(series);
+
       console.log("\n");
       printPerformanceTable("resolve");
     }

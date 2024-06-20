@@ -107,19 +107,127 @@ export type SegmentationEdge = {
   readonly segment?: SegmentDefinition[];
 };
 
-export type AnalysisEdge = {
-  readonly type: EdgeType.Analysis;
-};
-
 export type RelatedEdge = {
   readonly type: EdgeType.Related;
 };
 
+// ANALYSIS
+
+/** @see {isAllocationAnalysisType} ts-auto-guard:type-guard */
+export enum AllocationAnalysisType {
+  Allocation = "allocation",
+  AllocationNormalized = "allocation-normalized"
+}
+
+/** @see {isGrowthRateAnalysisType} ts-auto-guard:type-guard */
+export enum GrowthRateAnalysisType {
+  GrowthRate = "growth-rate",
+  GrowthRateNormalized = "growth-rate-normalized"
+}
+
+/** @see {isCorrelationAnalysisType} ts-auto-guard:type-guard */
+export enum CorrelationAnalysisType {
+  Correlation = "correlation"
+}
+
+/** @see {isMixshiftAnalysisType} */
+export enum MixshiftAnalysisType {
+  MixshiftMetricChangeFirst = "mixshift-metric-change-first",
+  MixshiftSegmentChangeFirst = "mixshift-segment-change-first",
+  MixshiftAverage = "mixshift-average"
+}
+
+export type AnalysisType =
+  | AllocationAnalysisType
+  | GrowthRateAnalysisType
+  | CorrelationAnalysisType
+  | MixshiftAnalysisType;
+
+export type AnalysisState = [
+  AllocationAnalysisType | GrowthRateAnalysisType | CorrelationAnalysisType,
+  MixshiftAnalysisType | null
+];
+
+export interface Analysis<T extends AnalysisType, U> {
+  analysis: T;
+  data: Observable<U>;
+}
+
+export type ComparisonResult<T> = {
+  readonly before: Date;
+  readonly after: Date;
+  readonly value: T | null;
+  readonly format: ValueFormat;
+};
+
+export type MixshiftResult = {
+  type:
+    | MixshiftAnalysisType.MixshiftMetricChangeFirst
+    | MixshiftAnalysisType.MixshiftSegmentChangeFirst
+    | MixshiftAnalysisType.MixshiftAverage;
+  allocation: number;
+  dueToMetric: number;
+  dueToVolume: number;
+};
+
+export type AllocationAnalysis = Analysis<
+  AllocationAnalysisType.Allocation,
+  ComparisonResult<number>
+>;
+
+export type AllocationNormalizedAnalysis = Analysis<
+  AllocationAnalysisType.AllocationNormalized,
+  ComparisonResult<number>
+>;
+
+export type GrowthRateAnalysis = Analysis<
+  GrowthRateAnalysisType.GrowthRate,
+  ComparisonResult<number>
+>;
+
+export type GrowthRateNormalizedAnalysis = Analysis<
+  GrowthRateAnalysisType.GrowthRateNormalized,
+  ComparisonResult<number>
+>;
+
+export type CorrelationAnalysis = Analysis<
+  CorrelationAnalysisType.Correlation,
+  ComparisonResult<number>
+>;
+
+export type MixshiftMetricChangeFirstAnalysis = Analysis<
+  MixshiftAnalysisType.MixshiftMetricChangeFirst,
+  ComparisonResult<MixshiftResult>
+>;
+
+export type MixshiftSegmentChangeFirstAnalysis = Analysis<
+  MixshiftAnalysisType.MixshiftSegmentChangeFirst,
+  ComparisonResult<MixshiftResult>
+>;
+
+export type MixshiftAverageAnalysis = Analysis<
+  MixshiftAnalysisType.MixshiftAverage,
+  ComparisonResult<MixshiftResult>
+>;
+
+export type AnalysisEdge<A extends Analysis<AnalysisType, unknown>> = {
+  readonly type: EdgeType.Analysis;
+} & A;
+
 export type TreeEdge =
+  | AnalysisEdge<
+      | AllocationAnalysis
+      | AllocationNormalizedAnalysis
+      | GrowthRateAnalysis
+      | GrowthRateNormalizedAnalysis
+      | CorrelationAnalysis
+      | MixshiftMetricChangeFirstAnalysis
+      | MixshiftSegmentChangeFirstAnalysis
+      | MixshiftAverageAnalysis
+    >
   | ArithmeticEdge
-  | SegmentationEdge
-  | AnalysisEdge
-  | RelatedEdge;
+  | RelatedEdge
+  | SegmentationEdge;
 
 export type TreeEdgeType<T, U extends EdgeType = any> = Extract<
   ReturnType<Subtree<T>["getEdgeAttributes"]>,
