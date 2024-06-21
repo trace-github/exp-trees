@@ -8,11 +8,13 @@ import {
 } from "@trace/artifacts";
 import { markAndMeasure } from "@trace/common";
 import {
+  AllocationAnalysisType,
   CorrelationAnalysisType,
   EdgeType,
   GrowthRateAnalysisType,
   NodeId,
   Tree,
+  allocationNormalizedEdge,
   arithmeticTree,
   correlationEdgeAttributes,
   edgesByType,
@@ -23,8 +25,6 @@ import {
   rxOperator,
   treeDates
 } from "@trace/tree";
-// @ts-expect-error "something up with arrow"
-import * as Arrow from "apache-arrow";
 import cliProgress from "cli-progress";
 import { MultiDirectedGraph } from "graphology";
 import os from "node:os";
@@ -173,10 +173,15 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
             const [source, target] = tree.extremities(edge);
             tree.addDirectedEdge(source, target, fn(tree, edge, config$));
           }
+
+          {
+            const attributes = allocationNormalizedEdge(tree, edge, config$);
+            const [source, target] = tree.extremities(edge);
+            tree.addDirectedEdge(source, target, attributes);
+          }
         },
 
-        onSegmentationEdge(tree, edge, attributes) {
-          console.log(attributes.type);
+        onSegmentationEdge(tree, edge) {
           {
             // Add Correlation Analysis
             const attributes = correlationEdgeAttributes(tree, edge, config$);
@@ -228,7 +233,8 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
 
           if (
             attributes.analysis != CorrelationAnalysisType.Correlation &&
-            attributes.analysis != GrowthRateAnalysisType.GrowthRate
+            attributes.analysis != GrowthRateAnalysisType.GrowthRate &&
+            attributes.analysis != AllocationAnalysisType.AllocationNormalized
           ) {
             continue;
           }
@@ -256,7 +262,7 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
           firstValueFrom(zip(analysis$))
         );
 
-        console.table(Arrow.tableFromJSON(table).toArray());
+        console.table(table);
       }
 
       console.log("\n");

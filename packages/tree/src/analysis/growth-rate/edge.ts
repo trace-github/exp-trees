@@ -30,7 +30,7 @@ export const growthRateForEdgeType = {
 };
 
 function arithmeticGrowthRateEdgeAttributes(
-  tree: Tree<CubeSeries> | Subtree<CubeSeries>,
+  tree: Subtree<CubeSeries>,
   edge: EdgeId,
   config$: Observable<[Date, Date]>
 ): {
@@ -50,7 +50,7 @@ function arithmeticGrowthRateEdgeAttributes(
 
   const data$ = combineLatest({
     growthRate: rxMetricGrowthRate(config$, source$),
-    allocation: rxMetricAllocation(config$, tree, edge)
+    allocation: rxMetricAllocation(tree, edge, config$)
   }).pipe(
     map(
       ({

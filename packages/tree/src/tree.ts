@@ -2,6 +2,7 @@ import { CubeSeries } from "@trace/artifacts";
 import Graph from "graphology";
 import { subgraph } from "graphology-operators";
 import { bfsFromNode } from "graphology-traversal";
+import { AnalysisError } from "./analysis";
 import {
   EdgeId,
   EdgeType,
@@ -171,4 +172,42 @@ export function isEdgeType<T, U extends EdgeType>(
   mustBeType: U
 ): attributes is TreeEdgeType<T, U> {
   return attributes.type == mustBeType;
+}
+
+export function oneOfEdgeType<T>(
+  attributes: TreeEdgeType<T>,
+  mustBeOneOf: EdgeType[]
+): boolean {
+  return mustBeOneOf.includes(attributes.type);
+}
+
+export function edgePath<T>(
+  tree: Subtree<T>,
+  start: NodeId,
+  end: NodeId,
+  accept: (edge: EdgeId, attributes: TreeEdge) => boolean = () => false
+) {
+  const path: EdgeId[] = [];
+  let head = end;
+  do {
+    const edges = tree.filterInEdges(
+      head,
+      (edge, attributes, _source, target) => {
+        if (target != head) return false;
+        return accept(edge, attributes);
+      }
+    );
+
+    if (edges.length != 1) AnalysisError.UnexpectedEdgeType;
+
+    const edge = edges[0];
+
+    path.push(edge);
+
+    const [source] = tree.extremities(edge);
+
+    head = source;
+  } while (head != start);
+
+  return path.reverse();
 }

@@ -1,6 +1,12 @@
+import { EdgeId } from "../types";
+
 export class AnalysisError extends Error {
   private constructor(message?: string) {
     super(message);
+  }
+
+  public static missingEdge(edge: EdgeId) {
+    return new AnalysisError(`Missing Edge: ${edge}.`);
   }
 
   public static InvalidSeries = new AnalysisError("Invalid series.");

@@ -23,7 +23,7 @@ import { rxMetricRatio } from "./ratio";
  * Throws `AnalysisError.InvalidNodeType` or `AnalysisError.InvalidEdgeType`
  * for invalid configurations.
  *
- * @param config - An Observable emitting a tuple of Dates representing the
+ * @param config$ - An Observable emitting a tuple of Dates representing the
  * period for analysis.
  * @param tree - The tree structure containing nodes and edges with associated
  * CubeSeries data.
@@ -34,9 +34,9 @@ import { rxMetricRatio } from "./ratio";
  * performed due to missing data.
  */
 export function rxMetricAllocation(
-  config: Observable<[Date, Date]>,
   tree: Subtree<CubeSeries>,
-  edge: EdgeId
+  edge: EdgeId,
+  config$: Observable<[Date, Date]>
 ): Observable<ComparisonResult<number>> {
   const attributes = tree.getEdgeAttributes(edge);
 
@@ -51,18 +51,18 @@ export function rxMetricAllocation(
 
       switch (attributes.operator) {
         case "*":
-          return productAllocation(config, tree, edge);
+          return productAllocation(config$, tree, edge);
         case "+":
-          return additionAllocation(config, tree, edge);
+          return additionAllocation(config$, tree, edge);
         case "-":
-          return subtractionAllocation(config, tree, edge);
+          return subtractionAllocation(config$, tree, edge);
         case "/":
-          return divisionAllocation(config, tree, edge);
+          return divisionAllocation(config$, tree, edge);
       }
     }
 
     case EdgeType.Segmentation:
-      return segmentAllocation(config, tree, edge);
+      return segmentAllocation(tree, edge, config$);
   }
 
   throw AnalysisError.UnexpectedEdgeType;
@@ -259,9 +259,9 @@ function divisionAllocation(
 //                                   metricChange(x)
 
 function segmentAllocation(
-  config: Observable<[Date, Date]>,
   tree: Subtree<CubeSeries>,
-  edge: EdgeId
+  edge: EdgeId,
+  config$: Observable<[Date, Date]>
 ): Observable<ComparisonResult<number>> {
   // mustBeEdgeType(tree, edge, EdgeType.Segmentation);
 
@@ -270,13 +270,13 @@ function segmentAllocation(
   const edgeMap = outboundEdgesByType(tree, x_a, EdgeType.Arithmetic);
   const edgeAttributes = Object.keys(edgeMap);
 
-  return config.pipe(
+  return config$.pipe(
     switchMap(([before, after]) => {
       return zip(
         rxMetricChange([before, after], tree, x),
         rxMetricChange([before, after], tree, x_a),
         zip(
-          edgeAttributes.map((edge) => rxMetricAllocation(config, tree, edge))
+          edgeAttributes.map((edge) => rxMetricAllocation(tree, edge, config$))
         )
       ).pipe(
         map(([mc_x, mc_x_a, allocations]) => {
