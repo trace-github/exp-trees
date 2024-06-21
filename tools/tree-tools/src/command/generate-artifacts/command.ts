@@ -12,7 +12,10 @@ import {
   CorrelationAnalysisType,
   EdgeType,
   GrowthRateAnalysisType,
+  MixshiftAnalysisType,
+  MixshiftResult,
   NodeId,
+  NodeType,
   Tree,
   allocationEdge,
   allocationNormalizedEdge,
@@ -20,7 +23,11 @@ import {
   correlationEdge,
   edgesByType,
   growthRateForEdgeType,
+  growthRateNormalizedEdge,
   initLegacyTrees,
+  mixshiftAverageEdge,
+  mixshiftMetricChangeFirstEdge,
+  mixshiftMetricSegmentChangeFirstEdge,
   resolvingVisitor,
   rxMetric,
   rxOperator,
@@ -33,6 +40,7 @@ import {
   Observable,
   ReplaySubject,
   Subject,
+  defaultIfEmpty,
   firstValueFrom,
   map,
   tap,
@@ -161,62 +169,107 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
         },
 
         onArithmeticEdge(tree, edge) {
+          const [source, target] = tree.extremities(edge);
+
           {
             // Add Correlation Analysis
             const attributes = correlationEdge(tree, edge, config$);
-            const [source, target] = tree.extremities(edge);
             tree.addDirectedEdge(source, target, attributes);
           }
 
           {
             // Add Growth Rate Analysis
             const fn = growthRateForEdgeType[EdgeType.Arithmetic];
-            const [source, target] = tree.extremities(edge);
             tree.addDirectedEdge(source, target, fn(tree, edge, config$));
+          }
+
+          {
+            // Add Growth Rate (Normalized) Analysis
+            tree.addDirectedEdge(
+              source,
+              target,
+              growthRateNormalizedEdge(tree, edge, config$)
+            );
           }
 
           {
             // Add Allocation Analysis
             const attributes = allocationEdge(tree, edge, config$);
-            const [source, target] = tree.extremities(edge);
             tree.addDirectedEdge(source, target, attributes);
           }
 
           {
             // Add Allocation (Normalized) Analysis
             const attributes = allocationNormalizedEdge(tree, edge, config$);
-            const [source, target] = tree.extremities(edge);
             tree.addDirectedEdge(source, target, attributes);
           }
         },
 
         onSegmentationEdge(tree, edge) {
+          const [source, target] = tree.extremities(edge);
+
           {
             // Add Correlation Analysis
             const attributes = correlationEdge(tree, edge, config$);
-            const [source, target] = tree.extremities(edge);
             tree.addDirectedEdge(source, target, attributes);
           }
 
           {
             // Add Growth Rate Analysis
             const fn = growthRateForEdgeType[EdgeType.Segmentation];
-            const [source, target] = tree.extremities(edge);
             tree.addDirectedEdge(source, target, fn(tree, edge, config$));
+          }
+
+          {
+            // Add Growth Rate (Normalized) Analysis
+            tree.addDirectedEdge(
+              source,
+              target,
+              growthRateNormalizedEdge(tree, edge, config$)
+            );
           }
 
           {
             // Add Allocation Analysis
             const attributes = allocationEdge(tree, edge, config$);
-            const [source, target] = tree.extremities(edge);
             tree.addDirectedEdge(source, target, attributes);
           }
 
           {
             // Add Allocation (Normalized) Analysis
             const attributes = allocationNormalizedEdge(tree, edge, config$);
-            const [source, target] = tree.extremities(edge);
             tree.addDirectedEdge(source, target, attributes);
+          }
+
+          {
+            // Add Mixshift Analysis
+            const sourceAttributes = tree.getSourceAttributes(edge);
+            if (sourceAttributes.type == NodeType.Operator) {
+              if (sourceAttributes.operator == "/") {
+                {
+                  const attributes = mixshiftAverageEdge(tree, edge, config$);
+                  tree.addDirectedEdge(source, target, attributes);
+                }
+
+                {
+                  const attributes = mixshiftMetricChangeFirstEdge(
+                    tree,
+                    edge,
+                    config$
+                  );
+                  tree.addDirectedEdge(source, target, attributes);
+                }
+
+                {
+                  const attributes = mixshiftMetricSegmentChangeFirstEdge(
+                    tree,
+                    edge,
+                    config$
+                  );
+                  tree.addDirectedEdge(source, target, attributes);
+                }
+              }
+            }
           }
         }
       });
@@ -251,43 +304,76 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
           value: number | null;
           format: string;
         }>[] = [];
+        const mixshift$: Observable<{
+          source: NodeId;
+          target: NodeId;
+          type: string;
+          value: MixshiftResult | null;
+          format: string;
+        }>[] = [];
+
         for (const [edge, attributes] of Object.entries(analysisEdgeMap)) {
           const [source, target] = tree.extremities(edge);
-
-          if (
-            attributes.analysis != CorrelationAnalysisType.Correlation &&
-            attributes.analysis != GrowthRateAnalysisType.GrowthRate &&
-            attributes.analysis !=
-              AllocationAnalysisType.AllocationNormalized &&
-            attributes.analysis != AllocationAnalysisType.Allocation
-          ) {
-            continue;
-          }
-
           const sourceLabel = tree.getNodeAttribute(source, "label");
           const targetLabel = tree.getNodeAttribute(target, "label");
 
-          analysis$.push(
-            attributes.data.pipe(
-              map((result) => ({
-                source: sourceLabel,
-                target: targetLabel,
-                type: attributes.analysis,
-                value: result.value,
-                format: result.format
-              }))
-            )
-          );
+          if (
+            attributes.analysis == CorrelationAnalysisType.Correlation ||
+            attributes.analysis == GrowthRateAnalysisType.GrowthRate ||
+            attributes.analysis ==
+              GrowthRateAnalysisType.GrowthRateNormalized ||
+            attributes.analysis == AllocationAnalysisType.Allocation ||
+            attributes.analysis == AllocationAnalysisType.AllocationNormalized
+          ) {
+            analysis$.push(
+              attributes.data.pipe(
+                map((result) => ({
+                  source: sourceLabel,
+                  target: targetLabel,
+                  type: attributes.analysis,
+                  value: result.value,
+                  format: result.format
+                }))
+              )
+            );
+          }
+
+          if (
+            attributes.analysis == MixshiftAnalysisType.MixshiftAverage ||
+            attributes.analysis ==
+              MixshiftAnalysisType.MixshiftMetricChangeFirst ||
+            attributes.analysis ==
+              MixshiftAnalysisType.MixshiftSegmentChangeFirst
+          ) {
+            mixshift$.push(
+              attributes.data.pipe(
+                map((result) => ({
+                  source: sourceLabel,
+                  target: targetLabel,
+                  type: attributes.analysis,
+                  value: result.value,
+                  format: result.format
+                }))
+              )
+            );
+          }
         }
 
         config$.next(dates);
 
-        const table = await markAndMeasure(
+        const numericalTable = await markAndMeasure(
           "resolve-analysis",
-          firstValueFrom(zip(analysis$))
+          firstValueFrom(zip(analysis$).pipe(defaultIfEmpty([])))
         );
 
-        console.table(table);
+        console.table(numericalTable);
+
+        const mixshiftTable = await markAndMeasure(
+          "resolve-analysis",
+          firstValueFrom(zip(mixshift$).pipe(defaultIfEmpty([])))
+        );
+
+        console.table(mixshiftTable);
       }
 
       console.log("\n");

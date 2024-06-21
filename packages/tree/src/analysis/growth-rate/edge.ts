@@ -21,6 +21,7 @@ import {
 import { sumComparisonResults } from "../comparison";
 import { AnalysisError } from "../errors";
 import { rxMetricAllocation } from "../metric-allocation";
+import { rxMetricAllocationNormalized } from "../metric-allocation-normalized";
 import { rxMetricGrowthRate } from "../metric-growth-rate";
 import { edgeData } from "../utils";
 
@@ -119,5 +120,55 @@ function segmentationGrowthRateEdgeAttributes(
     type: EdgeType.Analysis,
     analysis: GrowthRateAnalysisType.GrowthRate,
     data: defer(() => data$)
+  };
+}
+
+export function growthRateNormalizedEdge(
+  tree: Subtree<CubeSeries>,
+  edge: EdgeId,
+  config$: Observable<[Date, Date]>
+): {
+  type: EdgeType.Analysis;
+  analysis: GrowthRateAnalysisType.GrowthRateNormalized;
+  data: Observable<ComparisonResult<number>>;
+} {
+  const {
+    attributes,
+    sourceAttributes: { data: source$ }
+  } = edgeData(tree, edge);
+
+  if (source$ == undefined) throw AnalysisError.InvalidSeries;
+  if (
+    attributes.type != EdgeType.Arithmetic &&
+    attributes.type != EdgeType.Segmentation
+  ) {
+    throw AnalysisError.UnexpectedEdgeType;
+  }
+
+  const data$ = combineLatest({
+    growthRate: rxMetricGrowthRate(config$, source$),
+    allocation: rxMetricAllocationNormalized(tree, edge, config$)
+  }).pipe(
+    map(
+      ({
+        growthRate: { before, after, value: growthRate },
+        allocation: { value: allocation }
+      }) => {
+        let value: number | null;
+        if (growthRate == null || allocation == null) {
+          value = null;
+        } else {
+          value = growthRate * allocation;
+        }
+
+        return { before, after, value, format: ValueFormat.Percent };
+      }
+    )
+  );
+
+  return {
+    type: EdgeType.Analysis,
+    analysis: GrowthRateAnalysisType.GrowthRateNormalized,
+    data: data$
   };
 }
