@@ -14,9 +14,10 @@ import {
   GrowthRateAnalysisType,
   NodeId,
   Tree,
+  allocationEdge,
   allocationNormalizedEdge,
   arithmeticTree,
-  correlationEdgeAttributes,
+  correlationEdge,
   edgesByType,
   growthRateForEdgeType,
   initLegacyTrees,
@@ -162,7 +163,7 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
         onArithmeticEdge(tree, edge) {
           {
             // Add Correlation Analysis
-            const attributes = correlationEdgeAttributes(tree, edge, config$);
+            const attributes = correlationEdge(tree, edge, config$);
             const [source, target] = tree.extremities(edge);
             tree.addDirectedEdge(source, target, attributes);
           }
@@ -175,6 +176,14 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
           }
 
           {
+            // Add Allocation Analysis
+            const attributes = allocationEdge(tree, edge, config$);
+            const [source, target] = tree.extremities(edge);
+            tree.addDirectedEdge(source, target, attributes);
+          }
+
+          {
+            // Add Allocation (Normalized) Analysis
             const attributes = allocationNormalizedEdge(tree, edge, config$);
             const [source, target] = tree.extremities(edge);
             tree.addDirectedEdge(source, target, attributes);
@@ -184,7 +193,7 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
         onSegmentationEdge(tree, edge) {
           {
             // Add Correlation Analysis
-            const attributes = correlationEdgeAttributes(tree, edge, config$);
+            const attributes = correlationEdge(tree, edge, config$);
             const [source, target] = tree.extremities(edge);
             tree.addDirectedEdge(source, target, attributes);
           }
@@ -194,6 +203,20 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
             const fn = growthRateForEdgeType[EdgeType.Segmentation];
             const [source, target] = tree.extremities(edge);
             tree.addDirectedEdge(source, target, fn(tree, edge, config$));
+          }
+
+          {
+            // Add Allocation Analysis
+            const attributes = allocationEdge(tree, edge, config$);
+            const [source, target] = tree.extremities(edge);
+            tree.addDirectedEdge(source, target, attributes);
+          }
+
+          {
+            // Add Allocation (Normalized) Analysis
+            const attributes = allocationNormalizedEdge(tree, edge, config$);
+            const [source, target] = tree.extremities(edge);
+            tree.addDirectedEdge(source, target, attributes);
           }
         }
       });
@@ -234,7 +257,9 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
           if (
             attributes.analysis != CorrelationAnalysisType.Correlation &&
             attributes.analysis != GrowthRateAnalysisType.GrowthRate &&
-            attributes.analysis != AllocationAnalysisType.AllocationNormalized
+            attributes.analysis !=
+              AllocationAnalysisType.AllocationNormalized &&
+            attributes.analysis != AllocationAnalysisType.Allocation
           ) {
             continue;
           }

@@ -14,7 +14,7 @@ import {
 import { AnalysisError } from "../errors";
 import { edgeData } from "../utils";
 
-export function correlationEdgeAttributes(
+export function correlationEdge(
   tree: Tree<CubeSeries> | Subtree<CubeSeries>,
   edge: EdgeId,
   config$: Observable<[Date, Date]>
