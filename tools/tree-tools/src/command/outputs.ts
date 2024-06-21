@@ -27,6 +27,10 @@ export function printPerformanceTable(name: string): void {
 
   const durations = measurements.map(({ duration }) => duration);
 
+  if (durations.length == 0) {
+    return;
+  }
+
   if (durations.length == 1) {
     printTable(
       ["name", "#", "duration"],

@@ -13,6 +13,7 @@ import {
   from,
   map,
   of,
+  shareReplay,
   toArray
 } from "rxjs";
 import { rxCubeSeriesTransform } from "../../transform/transform";
@@ -98,6 +99,10 @@ export function rxOperator(
     rxEvaluateExpression(),
 
     // Apply series transforms
-    rxCubeSeriesTransform(metricName, transform)
+    rxCubeSeriesTransform(metricName, transform),
+
+    // NOTE: This is important. Edges will subscribe to the series. The
+    // above operations are expensive.
+    shareReplay(1)
   );
 }

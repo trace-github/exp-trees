@@ -293,6 +293,8 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
       console.log("\n");
 
       printPerformanceTable("resolve-analysis");
+
+      printPerformanceTable("allocationEdge");
     }
 
     await db.terminate();

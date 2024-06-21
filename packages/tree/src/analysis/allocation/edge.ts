@@ -1,5 +1,5 @@
 import { CubeSeries } from "@trace/artifacts";
-import { Observable, map, of, switchMap } from "rxjs";
+import { Observable, defer, map, of, switchMap } from "rxjs";
 import { rootNode } from "../../tree";
 import {
   AllocationAnalysisType,
@@ -47,7 +47,7 @@ export function allocationEdge(
   return {
     type: EdgeType.Analysis,
     analysis: AllocationAnalysisType.Allocation,
-    data: data$
+    data: defer(() => data$)
   };
 }
 
@@ -86,6 +86,6 @@ export function allocationNormalizedEdge(
   return {
     type: EdgeType.Analysis,
     analysis: AllocationAnalysisType.AllocationNormalized,
-    data: data$
+    data: defer(() => data$)
   };
 }
