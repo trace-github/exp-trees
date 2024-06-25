@@ -2,6 +2,7 @@ export * from "./analysis";
 export * from "./arithmetic";
 export * from "./legacy";
 export * from "./node";
+export * from "./output";
 export * from "./query";
 export * from "./segmentation";
 export * from "./tree";
