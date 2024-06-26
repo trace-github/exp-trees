@@ -2,7 +2,6 @@ export * from "./attributes";
 export * from "./catalog";
 export * from "./cube-series";
 export * from "./errors";
-export * from "./parquet";
 export * from "./reader";
 export * from "./resource";
 export * from "./time-grain";

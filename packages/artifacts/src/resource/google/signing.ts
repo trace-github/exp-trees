@@ -1,4 +1,4 @@
-import { ResourceError } from "../error";
+import { ResourceError } from "../errors";
 import { GoogleCloudStorageConfig, ResourceURL } from "../types";
 
 export function signer(

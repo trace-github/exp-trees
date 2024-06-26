@@ -1,7 +1,7 @@
 import { measure } from "@trace/common";
 import { readFile } from "fs/promises";
 import { Observable, from, map, shareReplay } from "rxjs";
-import { ResourceError } from "../error";
+import { ResourceError } from "../errors";
 import { FileBackedConfig, IResourceReader, ResourceURL } from "../types";
 
 export class FileBackedReader implements IResourceReader {

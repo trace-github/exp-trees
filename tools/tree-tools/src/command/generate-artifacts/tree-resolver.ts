@@ -22,7 +22,8 @@ import { Observable } from "rxjs";
 import { ComparisonEdgeFunc, EdgePredicate } from "./types";
 
 const alwaysTrue: EdgePredicate = () => true;
-const onlySourceOperator = (
+
+const isOperatorSource = (
   mustBeSign?: IOperatorNode<unknown>["operator"]
 ): EdgePredicate => {
   return (tree, edge) => {
@@ -46,9 +47,9 @@ const SegmentationComparisons: [EdgePredicate, ComparisonEdgeFunc][] = [
   [alwaysTrue, growthRateNormalizedEdge],
   [alwaysTrue, allocationEdge],
   [alwaysTrue, allocationNormalizedEdge],
-  [onlySourceOperator("/"), mixshiftAverageEdge],
-  [onlySourceOperator("/"), mixshiftMetricChangeFirstEdge],
-  [onlySourceOperator("/"), mixshiftMetricSegmentChangeFirstEdge]
+  [isOperatorSource("/"), mixshiftAverageEdge],
+  [isOperatorSource("/"), mixshiftMetricChangeFirstEdge],
+  [isOperatorSource("/"), mixshiftMetricSegmentChangeFirstEdge]
 ];
 
 export function resolveTree<T extends Tree<CubeSeries> | Subtree<CubeSeries>>(

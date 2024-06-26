@@ -1,4 +1,4 @@
-import { measure } from "@trace/common";
+import { join, measure } from "@trace/common";
 import {
   MonoTypeOperatorFunction,
   Observable,
@@ -8,7 +8,6 @@ import {
   shareReplay
 } from "rxjs";
 import { fetchArrayBuffer, fetchJSON } from "../fetch";
-import { pathJoin } from "../path";
 import {
   GoogleCloudStorageConfig,
   IResourceReader,
@@ -90,7 +89,7 @@ function fix__rxResolveAbsoluteLocation(
         if (resource.startsWith(bucket)) {
           resource = resource.slice(bucket.length);
         }
-        return pathJoin(bucket, resource.replace(/^\/|\/$/g, ""));
+        return join(bucket, resource.replace(/^\/|\/$/g, ""));
       })
     );
 }

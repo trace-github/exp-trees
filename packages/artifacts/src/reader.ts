@@ -322,7 +322,9 @@ function rxGenerateCubeSlice(
         const cubeFile = fsReader.resolve(cubeResource);
         const cubeBuffer = await firstValueFrom(fsReader.buffer(cubeResource));
 
-        const cubeSchema = await readSchemaFromBuffer(cubeBuffer);
+        const cubeSchema = await readSchemaFromBuffer(
+          new Uint8Array(cubeBuffer)
+        );
         const cubeMask = computeAttributeMask(
           readAttributeNames(cubeSchema),
           request.segment

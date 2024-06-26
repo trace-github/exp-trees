@@ -5,7 +5,7 @@ import {
   FileBackedConfig,
   GoogleCloudResourceReader,
   initParquetCatalog,
-  toParquetBuffer
+  parquetBuffer
 } from "@trace/artifacts";
 import { markAndMeasure } from "@trace/common";
 import {
@@ -153,13 +153,18 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
       printCubeSeries(series);
       printPerformanceTable("resolve");
 
-      const nodeSheetOutput = await firstValueFrom(
-        nodeSheet(arithmeticTree(tree), node, { maxDepth: Infinity })
+      const nodeSheetOutput = markAndMeasure(
+        "evaluate-node-sheet",
+        await firstValueFrom(
+          nodeSheet(arithmeticTree(tree), node, { maxDepth: Infinity })
+        )
       );
-      const nodeSheetBuffer = await toParquetBuffer(nodeSheetOutput);
+      const nodeSheetBuffer = await parquetBuffer(nodeSheetOutput);
       const nodeSheetFile = join(workdir, `${node}-nodesheet.parquet`);
 
       await writeFile(nodeSheetFile, nodeSheetBuffer);
+
+      printPerformanceTable("evaluate-node-sheet");
 
       // {
       //   const { dates } = await promptDates(firstValueFrom(treeDates(tree)));

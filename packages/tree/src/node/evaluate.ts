@@ -92,7 +92,7 @@ function validateDatesAreSame(arr: CubeSeries[]): void {
   }
 }
 
-export function rowScope(
+function rowScope(
   inputs: { [key: string]: CubeSeries },
   rowIdx: number
 ): { [key: string]: number | null } {
