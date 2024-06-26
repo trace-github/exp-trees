@@ -2,27 +2,20 @@ import { CubeSeries, readAttributeStartDates } from "@trace/artifacts";
 import { unique } from "@trace/common";
 import * as Arrow from "apache-arrow";
 import { bfsFromNode } from "graphology-traversal";
-import {
-  Observable,
-  combineLatest,
-  concatMap,
-  from,
-  map,
-  tap,
-  toArray
-} from "rxjs";
-import { TreeNodeError } from "../node/errors";
-import { rxCubeSeriesEnsureDates } from "../node/modifier";
-import { rootNode } from "../tree";
-import { NodeId, Subtree, Tree } from "../types";
-import { NodeSheetOutput } from "./types";
+import { Observable, combineLatest, concatMap, from, map, toArray } from "rxjs";
+import { TreeNodeError } from "../../node/errors";
+import { rxCubeSeriesEnsureDates } from "../../node/modifier";
+import { NodeId, Subtree, Tree } from "../../types";
+import { NodeSheetOutput } from "../types";
 
 export function nodeSheet(
   tree: Tree<CubeSeries> | Subtree<CubeSeries>,
-  root: NodeSheetOutput["root"] = rootNode(tree),
-  options: NodeSheetOutput["options"] = {}
+  config: NodeSheetOutput
 ): Observable<Arrow.Table> {
-  const { maxDepth = Infinity } = options;
+  const {
+    root,
+    options: { maxDepth = Infinity }
+  } = config;
 
   const columns$: { [key: NodeId]: Observable<CubeSeries> } = {};
   bfsFromNode(tree, root, (node, attributes, depth) => {
@@ -62,7 +55,6 @@ export function nodeSheet(
           return Arrow.tableFromJSON(rows);
         })
       );
-    }),
-    tap((table) => console.table(table.toArray()))
+    })
   );
 }

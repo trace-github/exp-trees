@@ -108,6 +108,9 @@ importers:
       '@js-temporal/polyfill':
         specifier: ^0.4.4
         version: 0.4.4
+      apache-arrow:
+        specifier: ^14
+        version: 14.0.2
       date-fns:
         specifier: ^3.6.0
         version: 3.6.0

@@ -88,7 +88,7 @@ export async function promptDates(input: Date[] | Promise<Date[]>) {
     dates = input;
   }
 
-  return prompts({
+  const answer = await prompts({
     type: "multiselect",
     name: "dates",
     min: 1,
@@ -99,4 +99,6 @@ export async function promptDates(input: Date[] | Promise<Date[]>) {
       value: curr
     }))
   });
+
+  return answer.dates as Date[];
 }

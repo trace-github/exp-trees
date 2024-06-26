@@ -12,8 +12,10 @@ import {
   NodeId,
   Tree,
   arithmeticTree,
+  comparisonTable,
   initLegacyTrees,
-  nodeSheet
+  nodeSheet,
+  treeDates
 } from "@trace/tree";
 import cliProgress from "cli-progress";
 import { MultiDirectedGraph } from "graphology";
@@ -25,7 +27,7 @@ import { CommandModule } from "yargs";
 import { dirExists, must, printTable, spinner } from "../../lib";
 import { duckdb } from "../../lib/duckdb/duckdb.node";
 import { printCubeSeries, printPerformanceTable } from "../outputs";
-import { promptNode, promptTree } from "../prompts";
+import { promptDates, promptNode, promptTree } from "../prompts";
 import { Trace } from "../trace";
 import { resolveTree } from "./tree-resolver";
 import { GenerateArtifactsArguments } from "./types";
@@ -153,9 +155,9 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
       printCubeSeries(series);
       printPerformanceTable("resolve");
 
-      const nodeSheetOutput = markAndMeasure(
+      const nodeSheetOutput = await markAndMeasure(
         "evaluate-node-sheet",
-        await firstValueFrom(
+        firstValueFrom(
           nodeSheet(arithmeticTree(tree), node, { maxDepth: Infinity })
         )
       );
@@ -165,6 +167,27 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
       await writeFile(nodeSheetFile, nodeSheetBuffer);
 
       printPerformanceTable("evaluate-node-sheet");
+
+      const dates = await promptDates(firstValueFrom(treeDates(tree)));
+
+      const mixshiftTable = await markAndMeasure(
+        "evaluate-comparison-table",
+        firstValueFrom(
+          comparisonTable(tree, {
+            date1: dates[0],
+            date2: dates[1],
+            options: {
+              maxDepth: 1
+            }
+          })
+        )
+      );
+      const mixshifTableBuffer = await parquetBuffer(mixshiftTable);
+      const mixshiftTabletFile = join(workdir, `${node}-mixshift.parquet`);
+
+      await writeFile(mixshiftTabletFile, mixshifTableBuffer);
+
+      console.table(mixshiftTable.toArray());
 
       // {
       //   const { dates } = await promptDates(firstValueFrom(treeDates(tree)));

@@ -7,7 +7,7 @@ export enum AnalysisOutputType {
 
 export interface NodeSheetOutput {
   type: AnalysisOutputType.NodeSheet;
-  root: NodeId | undefined;
+  root?: NodeId;
   options: {
     maxDepth?: number;
   };
@@ -15,10 +15,12 @@ export interface NodeSheetOutput {
 
 export interface ComparisonTableOutput {
   type: AnalysisOutputType.ComparisonTable;
-  root: NodeId | undefined;
+  root?: NodeId;
   date1: Date;
   date2: Date;
-  options: {};
+  options?: {
+    maxDepth?: number;
+  };
 }
 
 export type AnalysisOutput = NodeSheetOutput | ComparisonTableOutput;
