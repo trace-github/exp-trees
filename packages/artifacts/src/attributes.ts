@@ -1,6 +1,11 @@
 import * as Arrow from "apache-arrow";
-import { Attribute } from "./types";
-import { CubeSchema, CubeSeriesSchema, CubeSliceSchema } from "./types-schema";
+import { ArtifactError } from "./errors";
+import {
+  Attribute,
+  CubeSchema,
+  CubeSeriesSchema,
+  CubeSliceSchema
+} from "./types";
 
 /**
  * Computes a bitmask based on the difference between the definition and
@@ -99,7 +104,9 @@ export function readName(
     | Arrow.Table<CubeSeriesSchema>
 ): string {
   const firstRow = table.get(0);
-  // throw "Cannot extract `name` from empty Cube*";
-  if (firstRow == null) return "NO-NAME";
+  if (firstRow == null) {
+    throw ArtifactError.UnexpectedEmptyTable;
+  }
+
   return firstRow.name;
 }

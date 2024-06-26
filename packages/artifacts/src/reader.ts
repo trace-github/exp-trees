@@ -16,26 +16,28 @@ import {
   shareReplay,
   zip
 } from "rxjs";
-import { computeAttributeMask, readAttributeNames } from "../../attributes";
-import { ICatalogReader } from "../../catalog";
+import { computeAttributeMask, readAttributeNames } from "./attributes";
+import { ICatalogReader } from "./catalog";
 import {
   FileBackedConfig,
   FileBackedReader,
   FileBackedWriter,
   IResourceReader,
   ResourceURL
-} from "../../resource";
-import { CubeRequest, CubeSeriesRequest, CubeSliceRequest } from "../../types";
+} from "./resource";
 import {
   Cube,
+  CubeRequest,
   CubeSchema,
   CubeSeries,
+  CubeSeriesRequest,
   CubeSeriesSchema,
   CubeSlice,
-  CubeSliceSchema
-} from "../../types-schema";
-import { readSchemaFromBuffer } from "../schema";
-import { IArtifactReader } from "../types";
+  CubeSliceRequest,
+  CubeSliceSchema,
+  IArtifactReader
+} from "./types";
+import { readSchemaFromBuffer } from "./utils/parquet";
 
 export class DuckDBBackedArtifactsReader implements IArtifactReader {
   private readonly db: AsyncDuckDB;
@@ -103,10 +105,10 @@ export class DuckDBBackedArtifactsReader implements IArtifactReader {
       let obs: Observable<CubeSlice>;
       if (!cacheFileExists) {
         obs = of(request).pipe(
-          // Ensure that the cube shard is downloaded
+          // Ensure that the cube shard is downloaded.
           rxEnsureAction((request) => this.cubeShard(request)),
 
-          // Compute the slice
+          // Compute the slice.
           rxGenerateCubeSlice(this.db, this.catalog, this.cacheReader),
 
           // Write the result to file.
@@ -117,6 +119,8 @@ export class DuckDBBackedArtifactsReader implements IArtifactReader {
             await this.cacheWriter.writeBuffer(resource, cubeSliceBuffer);
             return cubeSlice;
           }),
+
+          // New requesters get the last result.
           shareReplay(1)
         );
       } else {

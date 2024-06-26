@@ -2,8 +2,13 @@ import { findIndexForEqualDate } from "@trace/common";
 import * as Arrow from "apache-arrow";
 import { compareAsc } from "date-fns";
 import { readAttributeStartDates } from "./attributes";
-import { Attribute, AttributeValue } from "./types";
-import { AttributeStruct, CubeSeries, CubeSeriesSchema } from "./types-schema";
+import {
+  Attribute,
+  AttributeStruct,
+  AttributeValue,
+  CubeSeries,
+  CubeSeriesSchema
+} from "./types";
 
 export class CubeSeriesBuilder {
   private readonly nameBuilder: Arrow.Utf8Builder;

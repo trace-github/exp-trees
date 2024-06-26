@@ -4,8 +4,7 @@ import hash from "object-hash";
 import { readParquet } from "parquet-wasm";
 import { firstValueFrom } from "rxjs";
 import { IResourceReader, ResourceURL } from "../resource";
-import { Attribute, CubeRequest, CubeTimeGrain } from "../types";
-import { Catalog } from "../types-schema";
+import { Attribute, Catalog, CubeRequest, CubeTimeGrain } from "../types";
 import { ICatalogReader, PathModifer } from "./types";
 
 export const initParquetCatalog = async (

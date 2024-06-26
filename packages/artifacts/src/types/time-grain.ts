@@ -47,26 +47,3 @@ export enum WeekStart {
   Friday = 5,
   Saturday = 6
 }
-
-export type Attribute = string;
-export type AttributeValue = string | number | bigint | boolean | Date | null;
-
-/** REQUESTS **/
-
-export interface CubeRequest {
-  metricName: string;
-  timeGrain: CubeTimeGrain;
-  segment: Attribute[];
-}
-
-export interface CubeSliceRequest {
-  metricName: string;
-  timeGrain: CubeTimeGrain;
-  segment: Attribute[];
-}
-
-export interface CubeSeriesRequest {
-  metricName: string;
-  timeGrain: CubeTimeGrain;
-  series: { name: Attribute; value?: AttributeValue }[];
-}

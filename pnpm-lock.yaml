@@ -147,9 +147,6 @@ importers:
       mathjs:
         specifier: ^12.4
         version: 12.4.3
-      parquet-wasm:
-        specifier: 0.6.0
-        version: 0.6.0
       rxjs:
         specifier: ^7.8.1
         version: 7.8.1
