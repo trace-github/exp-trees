@@ -5,7 +5,7 @@ import {
 } from "@trace/artifacts";
 import { parseISO } from "date-fns";
 import { TreeNodeError } from "../node/errors";
-import { DateValuePair } from "../types-transform";
+import { DateValuePair } from "../types/series-transform";
 import { localToUTC } from "./legacy";
 
 export function appendValues(

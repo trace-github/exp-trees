@@ -1,5 +1,5 @@
 import { CubeSeries } from "@trace/artifacts";
-import { Observable, defer, map, of, switchMap } from "rxjs";
+import { Observable, defer, map, of, shareReplay, switchMap } from "rxjs";
 import { rootNode } from "../../tree";
 import {
   AllocationAnalysisType,
@@ -39,7 +39,9 @@ export function allocationEdge(
           }
 
           return { before, after, value, format };
-        })
+        }),
+
+        shareReplay(1)
       );
     })
   );

@@ -11,10 +11,14 @@ import { markAndMeasure } from "@trace/common";
 import {
   NodeId,
   Tree,
+  arithmeticChildren,
   arithmeticTree,
   comparisonTable,
+  growthRateCell,
   initLegacyTrees,
+  nodeSection,
   nodeSheet,
+  rootNode,
   treeDates
 } from "@trace/tree";
 import cliProgress from "cli-progress";
@@ -158,7 +162,12 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
       const nodeSheetOutput = await markAndMeasure(
         "evaluate-node-sheet",
         firstValueFrom(
-          nodeSheet(arithmeticTree(tree), node, { maxDepth: Infinity })
+          nodeSheet(arithmeticTree(tree), {
+            root: node,
+            options: {
+              maxDepth: 1
+            }
+          })
         )
       );
       const nodeSheetBuffer = await parquetBuffer(nodeSheetOutput);
@@ -166,9 +175,8 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
 
       await writeFile(nodeSheetFile, nodeSheetBuffer);
 
-      printPerformanceTable("evaluate-node-sheet");
-
       const dates = await promptDates(firstValueFrom(treeDates(tree)));
+      config$.next([dates[0], dates[1]]);
 
       const mixshiftTable = await markAndMeasure(
         "evaluate-comparison-table",
@@ -177,106 +185,43 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
             date1: dates[0],
             date2: dates[1],
             options: {
-              maxDepth: 1
+              maxDepth: Infinity
             }
           })
         )
       );
       const mixshifTableBuffer = await parquetBuffer(mixshiftTable);
       const mixshiftTabletFile = join(workdir, `${node}-mixshift.parquet`);
-
       await writeFile(mixshiftTabletFile, mixshifTableBuffer);
 
-      console.table(mixshiftTable.toArray());
-
-      // {
-      //   const { dates } = await promptDates(firstValueFrom(treeDates(tree)));
-
-      //   const analysisEdgeMap = edgesByType(tree, EdgeType.Analysis);
-      //   const analysis$: Observable<{
-      //     source: NodeId;
-      //     target: NodeId;
-      //     type: string;
-      //     value: number | null;
-      //     format: string;
-      //   }>[] = [];
-      //   const mixshift$: Observable<{
-      //     source: NodeId;
-      //     target: NodeId;
-      //     type: string;
-      //     value: MixshiftResult | null;
-      //     format: string;
-      //   }>[] = [];
-
-      //   for (const [edge, attributes] of Object.entries(analysisEdgeMap)) {
-      //     const [source, target] = tree.extremities(edge);
-      //     const sourceLabel = tree.getNodeAttribute(source, "label");
-      //     const targetLabel = tree.getNodeAttribute(target, "label");
-
-      //     if (
-      //       attributes.analysis == CorrelationAnalysisType.Correlation ||
-      //       attributes.analysis == GrowthRateAnalysisType.GrowthRate ||
-      //       attributes.analysis ==
-      //         GrowthRateAnalysisType.GrowthRateNormalized ||
-      //       attributes.analysis == AllocationAnalysisType.Allocation ||
-      //       attributes.analysis == AllocationAnalysisType.AllocationNormalized
-      //     ) {
-      //       analysis$.push(
-      //         attributes.data.pipe(
-      //           map((result) => ({
-      //             source: sourceLabel,
-      //             target: targetLabel,
-      //             type: attributes.analysis,
-      //             value: result.value,
-      //             format: result.format
-      //           }))
-      //         )
-      //       );
-      //     }
-
-      //     if (
-      //       attributes.analysis == MixshiftAnalysisType.MixshiftAverage ||
-      //       attributes.analysis ==
-      //         MixshiftAnalysisType.MixshiftMetricChangeFirst ||
-      //       attributes.analysis ==
-      //         MixshiftAnalysisType.MixshiftSegmentChangeFirst
-      //     ) {
-      //       mixshift$.push(
-      //         attributes.data.pipe(
-      //           map((result) => ({
-      //             source: sourceLabel,
-      //             target: targetLabel,
-      //             type: attributes.analysis,
-      //             value: result.value,
-      //             format: result.format
-      //           }))
-      //         )
-      //       );
-      //     }
-      //   }
-
-      //   config$.next(dates);
-
-      //   const numericalTable = await markAndMeasure(
-      //     "resolve-analysis",
-      //     firstValueFrom(zip(analysis$).pipe(defaultIfEmpty([])))
-      //   );
-
-      //   console.table(numericalTable);
-
-      //   const mixshiftTable = await markAndMeasure(
-      //     "resolve-analysis",
-      //     firstValueFrom(zip(mixshift$).pipe(defaultIfEmpty([])))
-      //   );
-
-      //   console.table(mixshiftTable);
-      // }
-
+      console.table(mixshiftTable.slice(0, 5).toArray());
       console.log("\n");
 
       printPerformanceTable("resolve-analysis");
+      printPerformanceTable("evaluate-node-sheet");
+      printPerformanceTable("evaluate-comparison-table");
 
-      printPerformanceTable("allocationEdge");
+      const x = await firstValueFrom(
+        nodeSection(
+          tree,
+          [
+            [
+              rootNode(tree),
+              ...arithmeticChildren(tree, rootNode(tree), {
+                excludeRoot: true,
+                maxDepth: 1
+              })
+            ]
+          ],
+          config$,
+          growthRateCell,
+          {
+            prefix: "test"
+          }
+        )
+      );
+
+      console.table(x.toArray());
     }
 
     await db.terminate();

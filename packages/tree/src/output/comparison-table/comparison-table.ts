@@ -16,6 +16,7 @@ import {
   from,
   map,
   of,
+  take,
   tap,
   toArray
 } from "rxjs";
@@ -23,8 +24,13 @@ import { arithmeticTree } from "../../arithmetic";
 import { segmentationTree } from "../../segmentation";
 import { rootNode } from "../../tree";
 import {
+  AllocationAnalysisType,
+  CorrelationAnalysisType,
   EdgeType,
   FixedSegmentDefinition,
+  GrowthRateAnalysisType,
+  MixshiftAnalysisType,
+  MixshiftResult,
   NodeId,
   NodeType,
   SeriesDefinition,
@@ -56,8 +62,236 @@ export function comparisonTable(
     }),
     nodeValuesSection("after", tree, ordering, of(date2), {
       maxDepth
-    })
+    }),
+    analysisSection(
+      "allocation",
+      tree,
+      ordering,
+      AllocationAnalysisType.Allocation,
+      {
+        maxDepth
+      }
+    ),
+    analysisSection(
+      "allocation-normalized",
+      tree,
+      ordering,
+      AllocationAnalysisType.AllocationNormalized,
+      {
+        maxDepth
+      }
+    ),
+    analysisSection(
+      "growth-rate",
+      tree,
+      ordering,
+      GrowthRateAnalysisType.GrowthRate,
+      {
+        maxDepth
+      }
+    ),
+    analysisSection(
+      "growth-rate-normalized",
+      tree,
+      ordering,
+      GrowthRateAnalysisType.GrowthRateNormalized,
+      {
+        maxDepth
+      }
+    ),
+    mixshiftSection(
+      "mixshift-average",
+      tree,
+      ordering,
+      MixshiftAnalysisType.MixshiftAverage,
+      {
+        maxDepth
+      }
+    ),
+    mixshiftSection(
+      "mixshift-mcf",
+      tree,
+      ordering,
+      MixshiftAnalysisType.MixshiftMetricChangeFirst,
+      {
+        maxDepth
+      }
+    ),
+    mixshiftSection(
+      "mixshift-mcf",
+      tree,
+      ordering,
+      MixshiftAnalysisType.MixshiftSegmentChangeFirst,
+      {
+        maxDepth
+      }
+    )
   ]).pipe(map(assign));
+}
+
+function analysisSection(
+  sectionId: SectionId,
+  tree: Tree<CubeSeries> | Subtree<CubeSeries>,
+  ordering: NodeId[],
+  analysis:
+    | AllocationAnalysisType
+    | GrowthRateAnalysisType
+    | CorrelationAnalysisType,
+  options: {
+    maxDepth?: number;
+  } = {}
+): Observable<Arrow.Table> {
+  const { maxDepth = Infinity } = options;
+
+  const scan$ = from(ordering).pipe(
+    map((root): [NodeId, NodeId[]] => {
+      const anchorTree = arithmeticTree(tree, root);
+      const nodes: NodeId[] = [];
+      bfsFromNode(anchorTree, root, (node, _attributes, depth) => {
+        nodes.push(node);
+        return depth >= maxDepth;
+      });
+      return [root, nodes];
+    }),
+
+    concatMap(([_root, nodes]) => {
+      const columns$: Record<
+        NodeId,
+        Observable<number | null | undefined>
+      > = {};
+
+      for (const node of nodes) {
+        const { metricName } = tree.getNodeAttributes(node);
+        const column = columnName(metricName, sectionId);
+        columns$[column] = analysisValueFromEdge(tree, node, analysis).pipe(
+          take(1)
+        );
+      }
+
+      return combineLatest(columns$);
+    }),
+    toArray(),
+    map((arr) => {
+      return Arrow.tableFromJSON(arr);
+    }),
+    rxAnnotateSectionId(sectionId)
+  );
+
+  return scan$;
+}
+
+function analysisValueFromEdge(
+  tree: Tree<unknown> | Subtree<unknown>,
+  node: NodeId,
+  analysis:
+    | AllocationAnalysisType
+    | GrowthRateAnalysisType
+    | CorrelationAnalysisType
+): Observable<number | null | undefined> {
+  const edge = tree.findInEdge(node, (_edge, attributes) => {
+    return (
+      attributes.type == EdgeType.Analysis && attributes.analysis == analysis
+    );
+  });
+
+  if (!edge) return of(null);
+
+  const attributes = tree.getEdgeAttributes(edge);
+
+  // Type narrowing
+  if (attributes.type != EdgeType.Analysis || attributes.analysis != analysis) {
+    return of(null);
+  }
+
+  return attributes.data.pipe(map((data) => data.value));
+}
+
+function mixshiftSection(
+  sectionId: SectionId,
+  tree: Tree<CubeSeries> | Subtree<CubeSeries>,
+  ordering: NodeId[],
+  analysis: MixshiftAnalysisType,
+  options: {
+    maxDepth?: number;
+  } = {}
+): Observable<Arrow.Table> {
+  const { maxDepth = Infinity } = options;
+
+  const scan$ = from(ordering).pipe(
+    map((root): [NodeId, NodeId[]] => {
+      const anchorTree = arithmeticTree(tree, root);
+      const nodes: NodeId[] = [];
+      bfsFromNode(anchorTree, root, (node, _attributes, depth) => {
+        nodes.push(node);
+        return depth >= maxDepth;
+      });
+      return [root, nodes];
+    }),
+
+    concatMap(([_root, nodes]) => {
+      const columns$: Record<
+        NodeId,
+        Observable<number | null | undefined>
+      > = {};
+
+      for (const node of nodes) {
+        const { metricName } = tree.getNodeAttributes(node);
+        const column = columnName(metricName, sectionId);
+        const mixshift$ = mixshiftValueFromEdge(tree, node, analysis).pipe(
+          take(1)
+        );
+
+        columns$[`${column}-allocation`] = mixshift$.pipe(
+          map((result) => result?.allocation)
+        );
+        columns$[`${column}-dueToMetric`] = mixshift$.pipe(
+          map((result) => result?.dueToMetric)
+        );
+        columns$[`${column}-dueToVolume`] = mixshift$.pipe(
+          map((result) => result?.dueToVolume)
+        );
+      }
+
+      return combineLatest(columns$);
+    }),
+    toArray(),
+    map(Arrow.tableFromJSON),
+    rxAnnotateSectionId(sectionId)
+  );
+
+  return scan$;
+}
+
+function mixshiftValueFromEdge(
+  tree: Tree<unknown> | Subtree<unknown>,
+  node: NodeId,
+  analysis: MixshiftAnalysisType
+): Observable<MixshiftResult | null | undefined> {
+  const edge = tree.findInEdge(node, (_edge, attributes) => {
+    return (
+      attributes.type == EdgeType.Analysis && attributes.analysis == analysis
+    );
+  });
+
+  if (!edge) return of(null);
+
+  const attributes = tree.getEdgeAttributes(edge);
+
+  // Type narrowing
+  if (attributes.type != EdgeType.Analysis || attributes.analysis != analysis) {
+    return of(null);
+  }
+
+  return attributes.data.pipe(
+    map((data) => {
+      if (typeof data == "number") throw "x";
+
+      const value = data.value;
+      if (value == undefined) return undefined;
+
+      return data.value;
+    })
+  );
 }
 
 function debugSection<T>(

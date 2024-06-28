@@ -1,5 +1,5 @@
 import { CubeTimeGrain, ResourceURL } from "@trace/artifacts";
-import { TreeConfig } from "./types";
+import { TreeConfig } from "./tree";
 
 export type TreeResourceId = string;
 

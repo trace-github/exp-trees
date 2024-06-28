@@ -5,7 +5,10 @@ import {
 } from "@trace/artifacts";
 import { isSameDay, parseISO } from "date-fns";
 import { TreeNodeError } from "../node/errors";
-import { DateValuePair, SeriesTransformFunction } from "../types-transform";
+import {
+  DateValuePair,
+  SeriesTransformFunction
+} from "../types/series-transform";
 import { localToUTC } from "./legacy";
 
 export function replaceValue(

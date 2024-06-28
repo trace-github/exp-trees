@@ -5,7 +5,7 @@ import {
 } from "@trace/artifacts";
 // import { CubeSeries } from "@trace/artifacts-2";
 import { TreeNodeError } from "../node/errors";
-import { SeriesTransformFunction } from "../types-transform";
+import { SeriesTransformFunction } from "../types/series-transform";
 
 export function negateValues(name: string): SeriesTransformFunction {
   return (target: CubeSeries) => {

@@ -1,5 +1,12 @@
 import { CubeSeries } from "@trace/artifacts";
-import { Observable, OperatorFunction, concatMap, map, of } from "rxjs";
+import {
+  Observable,
+  OperatorFunction,
+  concatMap,
+  map,
+  of,
+  shareReplay
+} from "rxjs";
 import {
   ComparisonResult,
   EdgeId,
@@ -29,7 +36,9 @@ export function mixshiftMetricChangeFirstEdge(
     analysis: MixshiftAnalysisType.MixshiftMetricChangeFirst,
     data: mixshiftMetricChangeFirst(tree, edge, config$).pipe(
       map((result) => ({ tree, edge, result })),
-      rxFinalizeMixshiftResult()
+      rxFinalizeMixshiftResult(),
+
+      shareReplay(1)
     )
   };
 }
@@ -48,7 +57,8 @@ export function mixshiftMetricSegmentChangeFirstEdge(
     analysis: MixshiftAnalysisType.MixshiftSegmentChangeFirst,
     data: mixshiftSegmentChangeFirst(tree, edge, config$).pipe(
       map((result) => ({ tree, edge, result })),
-      rxFinalizeMixshiftResult()
+      rxFinalizeMixshiftResult(),
+      shareReplay(1)
     )
   };
 }

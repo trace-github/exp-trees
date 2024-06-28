@@ -24,7 +24,7 @@ export function rxMetricGrowthRate(
   );
 }
 
-function calculateGrowthRate(
+export function calculateGrowthRate(
   before: number | null,
   after: number | null,
   options: {

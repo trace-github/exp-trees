@@ -5,7 +5,7 @@ import {
   startOfTimeGrain
 } from "@trace/artifacts";
 import { TreeNodeError } from "../node/errors";
-import { SeriesTransformFunction, Timeshift } from "../types-transform";
+import { SeriesTransformFunction, Timeshift } from "../types/series-transform";
 
 export function timeShift(
   name: string,

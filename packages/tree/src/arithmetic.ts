@@ -1,4 +1,5 @@
 import { MultiDirectedGraph } from "graphology";
+import { bfsFromNode } from "graphology-traversal";
 import { traverseEdgeBreadthFirst } from "./traversal";
 import { rootNode } from "./tree";
 import { ArithmeticTree, EdgeType, NodeId, Subtree, Tree } from "./types";
@@ -44,4 +45,37 @@ export function arithmeticTree<T>(
   );
 
   return arithTree;
+}
+
+/**
+ * Retrieves children of a specified node in an arithmetic tree using BFS.
+ *
+ * @template T - The type of the data stored in the tree nodes.
+ * @param {Tree<T> | Subtree<T>} tree - The tree or subtree to traverse.
+ * @param {NodeId} root - The root node from which to start the traversal.
+ * @param {object} [options] - Optional parameters.
+ * @param {number} [options.maxDepth=Infinity] - The maximum depth to traverse.
+ * @param {boolean} [options.excludeRoot=true] - Whether to exclude the root node.
+ * @returns {NodeId[]} An array of node IDs representing the children of the root.
+ */
+export function arithmeticChildren<T = unknown>(
+  tree: Tree<T> | Subtree<T>,
+  root: NodeId,
+  options: { maxDepth?: number; excludeRoot?: boolean } = {}
+): NodeId[] {
+  const { maxDepth = Infinity, excludeRoot = false } = options;
+
+  const target = arithmeticTree(tree, root);
+  const nodes: NodeId[] = [];
+  bfsFromNode(target, root, (node, _, depth) => {
+    if (node == root && excludeRoot) {
+      return false;
+    }
+
+    nodes.push(node);
+
+    return depth >= maxDepth;
+  });
+
+  return nodes;
 }

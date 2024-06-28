@@ -5,7 +5,10 @@ import {
 } from "@trace/artifacts";
 
 import { TreeNodeError } from "../node/errors";
-import { ReplaceAllValues, SeriesTransformFunction } from "../types-transform";
+import {
+  ReplaceAllValues,
+  SeriesTransformFunction
+} from "../types/series-transform";
 
 export function replaceAllValues(
   name: string,

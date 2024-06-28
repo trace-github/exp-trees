@@ -9,10 +9,10 @@ export function edgeData<T>(tree: Subtree<T>, edge: EdgeId) {
   const attributes = tree.getEdgeAttributes(edge);
   const [source, target] = tree.extremities(edge);
 
-  if (!tree.hasNode(source)) throw AnalysisError.MissingNode;
+  if (!tree.hasNode(source)) throw AnalysisError.missingNode(source);
   const sourceAttributes = tree.getNodeAttributes(source);
 
-  if (!tree.hasNode(target)) throw AnalysisError.MissingNode;
+  if (!tree.hasNode(target)) throw AnalysisError.missingNode(target);
   const targetAttributes = tree.getNodeAttributes(target);
 
   return {

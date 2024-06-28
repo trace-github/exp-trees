@@ -44,7 +44,9 @@ function arithmeticGrowthRateEdgeAttributes(
     sourceAttributes: { data: source$ }
   } = edgeData(tree, edge);
 
-  if (source$ == undefined) throw AnalysisError.InvalidSeries;
+  if (source$ == undefined) {
+    throw AnalysisError.InvalidSeries;
+  }
   if (attributes.type != EdgeType.Arithmetic) {
     throw AnalysisError.UnexpectedEdgeType;
   }
@@ -105,7 +107,7 @@ function segmentationGrowthRateEdgeAttributes(
   const outboundEdges = Object.keys(outboundEdgeMap);
 
   // Sum the immediate arithmetic children growth rates.
-  const data$ = of(Object.keys(outboundEdges)).pipe(
+  const data$ = of(outboundEdges).pipe(
     concatMap((edges) => {
       return zip(
         edges.map(

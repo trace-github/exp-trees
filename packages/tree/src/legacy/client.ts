@@ -7,7 +7,7 @@ import {
   TreeListResponse,
   TreeResourceId,
   TreeResponse
-} from "../types-resource";
+} from "../types/resource";
 import { LegacyTreeCatalog } from "./types";
 import { isLegacyTreeCatalog } from "./types.guard";
 

@@ -4,7 +4,7 @@ import {
   SeriesTransform,
   SeriesTransformFunction,
   SeriesTransformType
-} from "../types-transform";
+} from "../types/series-transform";
 import { appendValues } from "./appendValues";
 import { negateValues } from "./negateValues";
 import { replaceAllValues } from "./replaceAllValues";

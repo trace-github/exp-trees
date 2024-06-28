@@ -10,7 +10,7 @@ import { NodeSheetOutput } from "../types";
 
 export function nodeSheet(
   tree: Tree<CubeSeries> | Subtree<CubeSeries>,
-  config: NodeSheetOutput
+  config: Omit<NodeSheetOutput, "type">
 ): Observable<Arrow.Table> {
   const {
     root,

@@ -7,6 +7,6 @@ export * from "./query";
 export * from "./segmentation";
 export * from "./tree";
 export * from "./types";
-export * from "./types-resource";
-export * from "./types-transform";
+export * from "./types/resource";
+export * from "./types/series-transform";
 export * from "./visitor";
