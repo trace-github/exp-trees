@@ -144,3 +144,29 @@ export function findCubeSeriesValueAtDate(series: CubeSeries, target: Date) {
 
   return Number(row.value);
 }
+
+/**
+ * Finds the count in a CubeSeries for a specified date.
+ *
+ * @param series - The CubeSeries object which contains the data. The dates in
+ * the series should be sorted in ascending order.
+ * @param target - The target date for which to find the corresponding value
+ * in the series.
+ * @returns The count associated with the target date in the CubeSeries, or
+ * `null` if the count is not found.
+ */
+export function findCubeSeriesCountAtDate(series: CubeSeries, target: Date) {
+  // CubeSeries dates should be sorted ASC
+  const starts = readAttributeStartDates(series);
+  const idx = findIndexForEqualDate(starts.sort(compareAsc), target);
+
+  if (idx == -1) return null;
+
+  const row = series.get(idx);
+
+  if (row == null) return null;
+
+  if (row.cnt == null) return null;
+
+  return Number(row.cnt);
+}

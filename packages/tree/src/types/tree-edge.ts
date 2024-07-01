@@ -130,21 +130,19 @@ export type MixshiftAverageAnalysis = Analysis<
   ComparisonResult<MixshiftResult>
 >;
 
-export type AnalysisEdge<A extends Analysis<AnalysisType, unknown>> = {
-  readonly type: EdgeType.Analysis;
-} & A;
+export type AnalysisEdge = { type: EdgeType.Analysis } & (
+  | AllocationAnalysis
+  | AllocationNormalizedAnalysis
+  | GrowthRateAnalysis
+  | GrowthRateNormalizedAnalysis
+  | CorrelationAnalysis
+  | MixshiftMetricChangeFirstAnalysis
+  | MixshiftSegmentChangeFirstAnalysis
+  | MixshiftAverageAnalysis
+);
 
 export type TreeEdge =
-  | AnalysisEdge<
-      | AllocationAnalysis
-      | AllocationNormalizedAnalysis
-      | GrowthRateAnalysis
-      | GrowthRateNormalizedAnalysis
-      | CorrelationAnalysis
-      | MixshiftMetricChangeFirstAnalysis
-      | MixshiftSegmentChangeFirstAnalysis
-      | MixshiftAverageAnalysis
-    >
+  | AnalysisEdge
   | ArithmeticEdge
   | RelatedEdge
   | SegmentationEdge;

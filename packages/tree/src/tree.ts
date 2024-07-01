@@ -3,7 +3,10 @@ import Graph from "graphology";
 import { subgraph } from "graphology-operators";
 import { bfsFromNode } from "graphology-traversal";
 import { AnalysisError } from "./analysis";
+import { TreeError } from "./errors";
 import {
+  AnalysisEdge,
+  AnalysisType,
   EdgeId,
   EdgeType,
   NodeId,
@@ -149,12 +152,76 @@ export function outboundEdgesByType<T, U extends EdgeType>(
   return outboundEdges;
 }
 
-export function hasIncomingEdgeOfType<T, U extends EdgeType>(
+export function hasOutboundEdgeOfType<T, U extends EdgeType>(
   tree: Subtree<T>,
   node: NodeId,
   mustBeOfType: U
 ): boolean {
   return Object.keys(outboundEdgesByType(tree, node, mustBeOfType)).length > 0;
+}
+
+/**
+ * Gets inbound edges of a specific type from a node in the tree.
+ *
+ * @param tree The tree to search within.
+ * @param node The ID of the node to get edges from.
+ * @param type The type of edges to retrieve.
+ * @returns A dictionary of edge IDs to edge attributes.
+ */
+export function inboundEdgesByType<T, U extends EdgeType>(
+  tree: Subtree<T>,
+  node: NodeId,
+  type: U
+): Record<EdgeId, Extract<TreeEdge, { type: U }>> {
+  const inboundEdges: Record<EdgeId, Extract<TreeEdge, { type: U }>> = {};
+
+  tree.forEachInboundEdge(node, (edge, attributes) => {
+    if (attributes.type === type) {
+      inboundEdges[edge] = attributes as Extract<TreeEdge, { type: U }>;
+    }
+  });
+
+  return inboundEdges;
+}
+
+export function inboundAnalysisEdgesByType<T, U extends AnalysisType>(
+  tree: Subtree<T>,
+  node: NodeId,
+  analysis: U
+) {
+  const inboundEdges = inboundEdgesByType(tree, node, EdgeType.Analysis);
+  const inboundAnalysisEdges: Record<
+    EdgeId,
+    Extract<AnalysisEdge, { type: EdgeType.Analysis; analysis: U }>
+  > = {};
+
+  Object.entries(inboundEdges).reduce((acc, [edge, attributes]) => {
+    if (attributes.analysis != analysis) return acc;
+    acc[edge] = attributes as Extract<
+      AnalysisEdge,
+      { type: EdgeType.Analysis; analysis: U }
+    >;
+    return acc;
+  }, inboundAnalysisEdges);
+
+  return inboundAnalysisEdges;
+}
+
+export function inboundAnalysisEdgeByType<T, U extends AnalysisType>(
+  tree: Subtree<T>,
+  node: NodeId,
+  analysis: U
+):
+  | [EdgeId, Extract<AnalysisEdge, { type: EdgeType.Analysis; analysis: U }>]
+  | undefined {
+  const analysisEdgeMap = inboundAnalysisEdgesByType(tree, node, analysis);
+  const analysisEdges = Object.entries(analysisEdgeMap);
+
+  if (analysisEdges.length > 1) {
+    throw TreeError.TooManyEdges;
+  }
+
+  return analysisEdges.at(0);
 }
 
 export function edgeIndexByType(

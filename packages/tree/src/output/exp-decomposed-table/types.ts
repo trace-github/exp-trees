@@ -1,17 +1,19 @@
 import { Observable } from "rxjs";
-import { NodeId, Subtree, Tree } from "../../types";
+import { NodeId, Subtree } from "../../types";
 
-export type Cell = {
-  column: string;
-  value: number | null | undefined;
-};
+export type Comparison = [null, null] | [Date, null] | [Date, Date];
 
-export type Row = Record<string, number | null | undefined>;
+export type Column = string;
 
-export interface CellFunc<T> {
+export type Cell = number | string | Date | null | undefined;
+export type RowCell = { [key: Column]: Cell };
+export type Row = Record<Column, Cell>;
+
+export interface RowFunc<T, U> {
   (
-    tree: Tree<T> | Subtree<T>,
-    node: NodeId,
-    comparison: [null, null] | [Date, null] | [Date, Date]
-  ): Observable<Cell>;
+    tree: Subtree<T>,
+    node: [NodeId, ...NodeId[]],
+    input: U,
+    idx: number
+  ): Observable<Row>;
 }

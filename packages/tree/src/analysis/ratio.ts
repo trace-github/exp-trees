@@ -11,8 +11,6 @@ export function rxMetricRatio(
   node: NodeId,
   nSiblings: number | undefined = undefined
 ): Observable<number | null> {
-  // mustHaveNode(tree, node);
-
   const series = tree.getNodeAttribute(node, "data");
 
   if (!series) throw AnalysisError.InvalidSeries;
@@ -30,7 +28,6 @@ export function rxMetricRatio(
 // Metric "ratio"
 // x = node
 // ratio = x_t1 / x_t0
-
 export function metricRatio(
   series: CubeSeries,
   before: Date,

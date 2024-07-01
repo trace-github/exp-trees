@@ -1,6 +1,6 @@
 import { CubeSeries, findCubeSeriesValueAtDate } from "@trace/artifacts";
 import { Observable, map, zip } from "rxjs";
-import { hasIncomingEdgeOfType, isEdgeType } from "../tree";
+import { hasOutboundEdgeOfType, isEdgeType } from "../tree";
 import { EdgeType, NodeId, NodeType, Tree } from "../types";
 import { AnalysisError } from "./errors";
 
@@ -42,7 +42,7 @@ export function rxSegmentWeight(
   tree: Tree<CubeSeries>,
   node: NodeId
 ): Observable<number | null> {
-  if (!hasIncomingEdgeOfType(tree, node, EdgeType.Segmentation)) {
+  if (!hasOutboundEdgeOfType(tree, node, EdgeType.Segmentation)) {
     throw AnalysisError.UnexpectedEdgeType;
   }
 

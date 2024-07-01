@@ -61,6 +61,7 @@ export function correlationEdge(
       );
 
       if (reducedSourceValues.length !== reducedTargetValues.length) {
+        console.error(reducedSourceValues.length, reducedTargetValues.length);
         throw AnalysisError.MalformedSeries;
       }
 

@@ -7,18 +7,23 @@ import {
   initParquetCatalog,
   parquetBuffer
 } from "@trace/artifacts";
-import { markAndMeasure } from "@trace/common";
+import { assign, markAndMeasure } from "@trace/common";
 import {
+  AllocationAnalysisType,
+  GrowthRateAnalysisType,
   NodeId,
   Tree,
-  arithmeticChildren,
+  analysisTable,
   arithmeticTree,
+  attributesTable,
   comparisonTable,
-  growthRateCell,
+  configDateTable,
+  debugTable,
   initLegacyTrees,
-  nodeSection,
+  metricRatioTable,
   nodeSheet,
-  rootNode,
+  segmentationTree,
+  seriesValueTable,
   treeDates
 } from "@trace/tree";
 import cliProgress from "cli-progress";
@@ -26,7 +31,14 @@ import { MultiDirectedGraph } from "graphology";
 import { writeFile } from "node:fs/promises";
 import os from "node:os";
 import { join } from "node:path";
-import { ReplaySubject, Subject, firstValueFrom } from "rxjs";
+import {
+  ReplaySubject,
+  Subject,
+  combineLatest,
+  firstValueFrom,
+  map,
+  of
+} from "rxjs";
 import { CommandModule } from "yargs";
 import { dirExists, must, printTable, spinner } from "../../lib";
 import { duckdb } from "../../lib/duckdb/duckdb.node";
@@ -129,12 +141,12 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
       console.log("\n");
     }
 
-    const config$: Subject<[Date, Date]> = new ReplaySubject(1);
+    const dates$: Subject<[Date, Date]> = new ReplaySubject(1);
 
     {
       const bar = new cliProgress.SingleBar({});
 
-      resolveTree(artifacts, tree, config$, {
+      resolveTree(artifacts, tree, dates$, {
         onMetricNode: () => bar.increment(),
         onOperatorNode: () => bar.increment()
       });
@@ -159,69 +171,112 @@ export const command: CommandModule<unknown, GenerateArtifactsArguments> = {
       printCubeSeries(series);
       printPerformanceTable("resolve");
 
-      const nodeSheetOutput = await markAndMeasure(
-        "evaluate-node-sheet",
-        firstValueFrom(
-          nodeSheet(arithmeticTree(tree), {
-            root: node,
-            options: {
-              maxDepth: 1
-            }
-          })
-        )
-      );
-      const nodeSheetBuffer = await parquetBuffer(nodeSheetOutput);
-      const nodeSheetFile = join(workdir, `${node}-nodesheet.parquet`);
-
-      await writeFile(nodeSheetFile, nodeSheetBuffer);
-
       const dates = await promptDates(firstValueFrom(treeDates(tree)));
-      config$.next([dates[0], dates[1]]);
+      dates$.next([dates[0], dates[1]]);
 
-      const mixshiftTable = await markAndMeasure(
-        "evaluate-comparison-table",
+      // eslint-disable-next-line no-constant-condition
+      if (false) {
+        const nodeSheetOutput = await markAndMeasure(
+          "evaluate-node-sheet",
+          firstValueFrom(
+            nodeSheet(arithmeticTree(tree), {
+              root: node,
+              options: {
+                maxDepth: 1
+              }
+            })
+          )
+        );
+        const nodeSheetBuffer = await parquetBuffer(nodeSheetOutput);
+        const nodeSheetFile = join(workdir, `${node}-nodesheet.parquet`);
+
+        await writeFile(nodeSheetFile, nodeSheetBuffer);
+
+        const mixshiftTable = await markAndMeasure(
+          "evaluate-comparison-table",
+          firstValueFrom(
+            comparisonTable(tree, {
+              date1: dates[0],
+              date2: dates[1],
+              options: {
+                maxDepth: Infinity
+              }
+            })
+          )
+        );
+        const mixshifTableBuffer = await parquetBuffer(mixshiftTable);
+        const mixshiftTabletFile = join(workdir, `${node}-mixshift.parquet`);
+        await writeFile(mixshiftTabletFile, mixshifTableBuffer);
+
+        console.table(mixshiftTable.slice(0, 5).toArray());
+        console.log("\n");
+
+        printPerformanceTable("resolve-analysis");
+        printPerformanceTable("evaluate-node-sheet");
+        printPerformanceTable("evaluate-comparison-table");
+      }
+
+      const ordering = segmentationTree(tree).nodes();
+
+      const before$ = dates$.pipe(map(([before]) => before));
+      const after$ = dates$.pipe(map(([, after]) => after));
+
+      const table = await spinner(
+        "Generating Table",
         firstValueFrom(
-          comparisonTable(tree, {
-            date1: dates[0],
-            date2: dates[1],
-            options: {
-              maxDepth: Infinity
-            }
-          })
+          combineLatest([
+            debugTable("debug", tree, ordering),
+
+            attributesTable("attributes", tree, ordering),
+
+            configDateTable("before", tree, ordering, before$),
+            seriesValueTable("before", tree, ordering, before$, 1),
+
+            configDateTable("after", tree, ordering, after$),
+            seriesValueTable("after", tree, ordering, after$, 1),
+
+            metricRatioTable("metricRatio", tree, ordering, dates$, 1),
+
+            analysisTable(
+              "allocation",
+              tree,
+              ordering,
+              of(AllocationAnalysisType.Allocation),
+              1
+            ),
+            analysisTable(
+              "allocationNormalized",
+              tree,
+              ordering,
+              of(AllocationAnalysisType.AllocationNormalized),
+              1
+            ),
+            analysisTable(
+              "growthRate",
+              tree,
+              ordering,
+              of(GrowthRateAnalysisType.GrowthRate),
+              1
+            ),
+            analysisTable(
+              "growthRateNormalized",
+              tree,
+              ordering,
+              of(GrowthRateAnalysisType.GrowthRateNormalized),
+              1
+            )
+          ]).pipe(map(assign))
         )
       );
-      const mixshifTableBuffer = await parquetBuffer(mixshiftTable);
-      const mixshiftTabletFile = join(workdir, `${node}-mixshift.parquet`);
+
+      const mixshifTableBuffer = await parquetBuffer(table);
+      const mixshiftTabletFile = join(
+        workdir,
+        `${node}-test-${Date.now()}.parquet`
+      );
       await writeFile(mixshiftTabletFile, mixshifTableBuffer);
 
-      console.table(mixshiftTable.slice(0, 5).toArray());
-      console.log("\n");
-
-      printPerformanceTable("resolve-analysis");
-      printPerformanceTable("evaluate-node-sheet");
-      printPerformanceTable("evaluate-comparison-table");
-
-      const x = await firstValueFrom(
-        nodeSection(
-          tree,
-          [
-            [
-              rootNode(tree),
-              ...arithmeticChildren(tree, rootNode(tree), {
-                excludeRoot: true,
-                maxDepth: 1
-              })
-            ]
-          ],
-          config$,
-          growthRateCell,
-          {
-            prefix: "test"
-          }
-        )
-      );
-
-      console.table(x.toArray());
+      console.table(table.slice(0, 5).toArray());
     }
 
     await db.terminate();

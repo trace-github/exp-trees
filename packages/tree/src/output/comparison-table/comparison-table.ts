@@ -27,7 +27,6 @@ import {
   AllocationAnalysisType,
   CorrelationAnalysisType,
   EdgeType,
-  FixedSegmentDefinition,
   GrowthRateAnalysisType,
   MixshiftAnalysisType,
   MixshiftResult,
@@ -35,7 +34,8 @@ import {
   NodeType,
   SeriesDefinition,
   Subtree,
-  Tree
+  Tree,
+  isFixedSegmentDefinition
 } from "../../types";
 import { ComparisonTableOutput } from "../types";
 import { SectionId } from "./types";
@@ -532,15 +532,4 @@ export function mergeSeries(target: SeriesDefinition[]): SeriesDefinition {
   }
 
   return result;
-}
-
-export function isFixedSegmentDefinition(
-  obj: unknown
-): obj is FixedSegmentDefinition {
-  const typedObj = obj as FixedSegmentDefinition;
-  return (
-    ((typedObj !== null && typeof typedObj === "object") ||
-      typeof typedObj === "function") &&
-    typedObj["name"] === "start"
-  );
 }
